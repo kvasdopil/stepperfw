@@ -45,19 +45,18 @@ String *readLine()
   return NULL;
 }
 
-int perDegreeX = 1;
-int perDegreeY = 1;
-const float STEPS_PER_1_DEGREE = (10000 / 360);
+int perRevolutionX = 10000;
+int perPevolutionY = 10000;
 const int REPORT_STATUS_EVERY_MS = 100;
 
 void reportStepperStatus(AccelStepper &stepper)
 {
   auto prefix = (&stepper == &stepperX) ? "X" : "Y";
-  auto perDegree = (&stepper == &stepperX) ? perDegreeX : perDegreeY;
-  Serial.println(String("") + prefix + "=" + (stepper.currentPosition() / (perDegree * STEPS_PER_1_DEGREE)) +
+  auto perRevo = (&stepper == &stepperX) ? perRevolutionX : perPevolutionY;
+  Serial.println(String("") + prefix + "=" + (stepper.currentPosition() / (float)perRevo) * 360.0 +
                  String(" A") + stepper.acceleration() +
                  String(" S") + stepper.maxSpeed() +
-                 String(" P") + perDegree);
+                 String(" P") + perRevo);
 }
 
 auto CHAR_0 = String("X").charAt(0);
@@ -104,8 +103,8 @@ void processCommandForServo(String line, AccelStepper &stepper)
   {
     // Serial.println(String("moving x: ") + value);
     auto tgt = value.toFloat();
-    auto perDegree = (&stepper == &stepperX) ? perDegreeX : perDegreeY;
-    stepper.moveTo(tgt * perDegree * STEPS_PER_1_DEGREE);
+    auto perRevo = (&stepper == &stepperX) ? perRevolutionX : perPevolutionY;
+    stepper.moveTo(tgt * (float)perRevo / 360.0);
     return;
   }
 
@@ -115,9 +114,9 @@ void processCommandForServo(String line, AccelStepper &stepper)
     if (tgt > 0)
     {
       if (&stepper == &stepperX)
-        perDegreeX = tgt;
+        perRevolutionX = tgt;
       else
-        perDegreeY = tgt;
+        perPevolutionY = tgt;
     }
     return;
   }
@@ -143,15 +142,42 @@ void loop()
 
   // print stepper position every .5 seconds
   static unsigned long lastPrint = 0;
-  static bool xWasMoving = false;
-  static bool yWasMoving = false;
 
   bool xMoving = stepperX.distanceToGo() != 0;
   bool yMoving = stepperY.distanceToGo() != 0;
+
+  // if (xMoving || yMoving)
+  // {
+  //   if (millis() - lastPrint > REPORT_STATUS_EVERY_MS)
+  //   {
+  //     lastPrint = millis();
+  //     if (xMoving)
+  //       reportStepperStatus(stepperX);
+  //     if (yMoving)
+  //       reportStepperStatus(stepperY);
+  //   }
+  // }
+
+  if (xMoving)
+  {
+    stepperX.run();
+    if (stepperX.distanceToGo() == 0)
+    {
+      lastPrint = 0; // force print when done moving
+    }
+  }
+
+  if (yMoving)
+  {
+    stepperY.run();
+    if (stepperY.distanceToGo() == 0)
+    {
+      lastPrint = 0; // force print when done moving
+    }
+  }
+
   if (xMoving || yMoving)
   {
-    xWasMoving = xMoving;
-    yWasMoving = yMoving;
     if (millis() - lastPrint > REPORT_STATUS_EVERY_MS)
     {
       lastPrint = millis();
@@ -161,21 +187,19 @@ void loop()
         reportStepperStatus(stepperY);
     }
   }
-  else if (xWasMoving || yWasMoving)
-  {
-    // print final position
-    if (xWasMoving)
-    {
-      reportStepperStatus(stepperX);
-      xWasMoving = false;
-    }
-    if (yWasMoving)
-    {
-      reportStepperStatus(stepperY);
-      yWasMoving = false;
-    }
-  }
 
-  stepperX.run();
-  stepperY.run();
+  //   // print final position
+  //   if (xWasMoving)
+  //   {
+  //     Serial.println("lastX");
+  //     reportStepperStatus(stepperX);
+  //     xWasMoving = false;
+  //   }
+  //   if (yWasMoving)
+  //   {
+  //     Serial.println("lastY");
+  //     reportStepperStatus(stepperY);
+  //     yWasMoving = false;
+  //   }
+  // }
 }
