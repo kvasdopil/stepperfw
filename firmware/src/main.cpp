@@ -1,17 +1,20 @@
 #include <Arduino.h>
 #include <AccelStepper.h>
 
-auto PULSE1 = D5;
-auto DIR1 = D6;
+auto const X_PULSE = 26;
+auto const X_DIR = 25;
 
-auto PULSE2 = D1;
-auto DIR2 = D0;
+auto const Y_PULSE = 4;
+auto const Y_DIR = 2;
 
-AccelStepper stepperX = AccelStepper(1, PULSE1, DIR1);
-AccelStepper stepperY = AccelStepper(1, PULSE2, DIR2);
+AccelStepper stepperX = AccelStepper(1, X_PULSE, X_DIR);
+AccelStepper stepperY = AccelStepper(1, Y_PULSE, Y_DIR);
 
 void setup()
 {
+  digitalWrite(D0, HIGH);
+  // digitalWrite(D0, LOW);
+
   stepperX.setMaxSpeed(1500);
   stepperX.setAcceleration(500);
 
@@ -143,8 +146,8 @@ void loop()
   // print stepper position every .5 seconds
   static unsigned long lastPrint = 0;
 
-  bool xMoving = stepperX.distanceToGo() != 0;
-  bool yMoving = stepperY.distanceToGo() != 0;
+  bool xMoving = stepperX.isRunning();
+  bool yMoving = stepperY.isRunning();
 
   // if (xMoving || yMoving)
   // {
@@ -186,6 +189,11 @@ void loop()
       if (yMoving)
         reportStepperStatus(stepperY);
     }
+  }
+
+  if (!yMoving && !xMoving)
+  {
+    delay(100);
   }
 
   //   // print final position
