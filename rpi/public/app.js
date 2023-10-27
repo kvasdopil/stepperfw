@@ -22,14 +22,14 @@ const Btn = ({ children, ...rest }) => <button style={{ width: 100, height: 100 
 const accel = 3000;
 const speed = 6000;
 
-const GET_ENCODER = 0x30;
-const GET_ANGLE = 0x36;
+// const GET_ENCODER = 0x30;
+// const GET_ANGLE = 0x36;
 const GET_PULSES = 0x33;
-const GET_ENABLED = 0x3a;
+// const GET_ENABLED = 0x3a;
 const GET_SERIAL_ENABLED = 0xf3;
-const SET_ROTATE = 0xfd;
+const ROTATE = 0xfd;
 const STOP = 0xf7;
-const SET_ACCEL = 0xa4; // 00 80 04
+// const SET_ACCEL = 0xa4; // 00 80 04
 
 const msgQueue = [];
 
@@ -60,30 +60,30 @@ const getPulses = async (id) => {
   return (a << 24) + (b << 16) + (c << 8) + d;
 }
 
-const getEncoder = async (id) => {
-  await lock();
-  send([0xe0 + id, GET_ENCODER]);
-  const [c, d] = await read(id, 2);
-  unlock();
-  return ((c << 8) + d) / 65536 * 360;
-}
+// const getEncoder = async (id) => {
+//   await lock();
+//   send([0xe0 + id, GET_ENCODER]);
+//   const [c, d] = await read(id, 2);
+//   unlock();
+//   return ((c << 8) + d) / 65536 * 360;
+// }
 
-const getPosition = async (id) => {
-  await lock();
-  send([0xe0 + id, GET_ANGLE]);
-  const [a, b, c, d] = await read(id, 4);
-  unlock();
-  // console.log(a, b, c, d);
-  return ((a << 24) + (b << 16) + (c << 8) + d) / 65536 * 360;
-}
+// const getPosition = async (id) => {
+//   await lock();
+//   send([0xe0 + id, GET_ANGLE]);
+//   const [a, b, c, d] = await read(id, 4);
+//   unlock();
+//   // console.log(a, b, c, d);
+//   return ((a << 24) + (b << 16) + (c << 8) + d) / 65536 * 360;
+// }
 
-const setAccel = async (id, accel) => {
-  await lock();
-  send([0xe0 + id, SET_ACCEL, (accel >> 8) & 0xff, accel & 0xff]);
-  const [ok] = await read(id, 1);
-  unlock();
-  return ok === 1;
-}
+// const setAccel = async (id, accel) => {
+//   await lock();
+//   send([0xe0 + id, SET_ACCEL, (accel >> 8) & 0xff, accel & 0xff]);
+//   const [ok] = await read(id, 1);
+//   unlock();
+//   return ok === 1;
+// }
 
 const stop = async (id) => {
   await lock();
@@ -135,7 +135,7 @@ const rotate = async (id, speed, position) => {
     console.log('rotate', pos, id, signBit, speed, p & 0xff, p >> 8);
     send([
       0xe0 + id,
-      SET_ROTATE,
+      ROTATE,
       signBit + speed,
       0xff && (p >> 8), p & 0xff
     ]);
