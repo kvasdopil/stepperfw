@@ -19,14 +19,6 @@ if (path) {
 
   cp.execSync('stty -F /dev/' + path + ' 9600 raw -echo -echoe -echok -echoctl -echoke', { stdio: 'inherit' });
 
-  // port = new SerialPort({
-  //   path: `/dev/${path}`,
-  //   baudRate: 115200,
-  //   dataBits: 8,
-  //   parity: 'none',
-  //   stopBits: 1,
-  // });
-
   port = fs.createWriteStream(`/dev/${path}`, { flags: 'w' });
 
   fs.createReadStream(`/dev/${path}`, { flags: 'r' }).on('data', (data) => {

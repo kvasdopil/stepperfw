@@ -28,6 +28,8 @@ const GET_PULSES = 0x33;
 const GET_ENABLED = 0x3a;
 const GET_SERIAL_ENABLED = 0xf3;
 const SET_ROTATE = 0xfd;
+const STOP = 0xf7;
+const SET_ACCEL = 0xa4; // 00 80 04
 
 const msgQueue = [];
 
@@ -75,10 +77,25 @@ const getPosition = async (id) => {
   return ((a << 24) + (b << 16) + (c << 8) + d) / 65536 * 360;
 }
 
+const setAccel = async (id, accel) => {
+  await lock();
+  send([0xe0 + id, SET_ACCEL, (accel >> 8) & 0xff, accel & 0xff]);
+  const [ok] = await read(id, 1);
+  unlock();
+  return ok === 1;
+}
+
+const stop = async (id) => {
+  await lock();
+  send([0xe0 + id, STOP]);
+  await read(id, 1);
+  unlock();
+}
+
 const monitorAxis = async (id, cb) => {
   let prev = null;
   while (true) {
-    await delay(300);
+    await delay(200);
     try {
       const angle = await getPulses(id);
 
@@ -108,14 +125,14 @@ const read = async (id, numBytes) => {
 
 // max speeed = 0x7f aka 127
 const rotate = async (id, speed, position) => {
-  let pos = Math.abs(position * 80000 / 360);
+  let pos = Math.abs(Math.round(position * 80000 / 360));
   let ok = 0;
   const signBit = (position > 0) ? 0b10000000 : 0;
   await lock();
   while (pos > 0) {
     const p = pos > 0xffff ? 0xffff : pos;
     pos -= p;
-    // console.log('rotate', pos, id, signBit, speed, p & 0xff, p >> 8);
+    console.log('rotate', pos, id, signBit, speed, p & 0xff, p >> 8);
     send([
       0xe0 + id,
       SET_ROTATE,
@@ -132,39 +149,19 @@ const rotate = async (id, speed, position) => {
 let lastX = null;
 const moveX = async (x) => {
   const axis = 1;
-  if (lastX === null) lastX = await getPosition(axis);
-  await rotate(axis, 100, x - lastX);
+  if (lastX === null) lastX = (await getPulses(axis)) / 80000 * 360;
+  console.log(x, lastX)
+  await rotate(axis, 120, x - lastX);
   lastX = x;
-  // send("XP40000");
-  // send("YP40000");
-  // send(`XS${speed}`);
-  // send(`XA${accel}`);
-  // send(`YS${speed}`);
-  // send(`YA${accel}`);
-  // send(`X=${x}`);
 }
 let lastY = null;
 const moveY = async (y) => {
   const axis = 0;
-  if (lastY === null) lastY = await getPosition(axis);
-  await rotate(axis, 100, y - lastY);
+  if (lastY === null) lastY = (await getPulses(axis)) / 80000 * 360;
+  console.log(y, lastY)
+  await rotate(axis, 120, y - lastY);
   lastY = y;
-  // send("XP40000");
-  // send("YP40000");
-  // send(`XS${speed}`);
-  // send(`XA${accel}`);
-  // send(`YS${speed}`);
-  // send(`YA${accel}`);
-  // send(`Y=${y}`);
 }
-
-// let lastX = null;
-// const moveXY = async (x, y) => {
-//   if (lastX === null) lastX = await getPosition(1);
-// }
-
-// let lastX = 0;
-// let lastY = 0;
 
 const App = () => {
   const [xPos, setXPos] = useState(0);
@@ -248,9 +245,9 @@ const App = () => {
   }
 
 
-  const onCircleClick = (e) => {
+  const onCircleClick = async (e) => {
     const a = setRot(e);
-    moveX(a);
+    await moveX(a);
   }
 
   const onRectMove = (e) => {
@@ -258,61 +255,54 @@ const App = () => {
     setElev(e);
   }
 
-  const onRectClick = (e) => {
+  const onRectClick = async (e) => {
     const a = setElev(e);
-    moveY(a);
+    await moveY(a);
+  }
+
+  const stopClick = async () => {
+    await stop(0);
+    await stop(1);
+    lastX = null;
+    lastY = null;
   }
 
   return (
     <div>
-      <div>{connected ? 'Connected' : 'Not connected'}</div>
-      {/* <div >
-        <div >
-          <Btn disabled={!connected} onClick={() => moveXY(+mul, -mul)}>X+ Y-</Btn>
-          <Btn disabled={!connected} onClick={() => moveX(+mul)}>X+</Btn>
-          <Btn disabled={!connected} onClick={() => moveXY(+mul, +mul)}>X+ Y+</Btn>
-        </div>
-        <div >
-          <Btn disabled={!connected} onClick={() => moveY(-mul)}>Y-</Btn>
-          <Btn disabled={!connected} onClick={() => toggleMul()}>{mul}</Btn>
-          <Btn disabled={!connected} onClick={() => moveY(mul)}>Y+</Btn>
-        </div>
-        <div>
-          <Btn disabled={!connected} onClick={() => moveXY(-mul, -mul)}>X- Y-</Btn>
-          <Btn disabled={!connected} onClick={() => moveX(-mul)}>X-</Btn>
-          <Btn disabled={!connected} onClick={() => moveXY(-mul, mul)}>X- Y+</Btn>
-        </div>
-      </div> */}
-      <div display="flex">
+      <div style={{ display: "flex" }}>
         <svg width="300" height="300" viewBox="0 0 100 100" >
-          <circle cx="50" cy="50" r="50" fill="#ccc" />
+          <circle cx="50" cy="50" r="49" fill="#333" stroke="#ccc" />
           <g style={{ transformOrigin: '50% 50%', transform: `rotate(${xPos}deg)` }}>
-            <line x1="45" y1="10" x2="50" y2="1" stroke="#000" />
-            <line x1="55" y1="10" x2="50" y2="1" stroke="#000" />
+            <line x1="45" y1="10" x2="50" y2="1" stroke="#ccc" />
+            <line x1="55" y1="10" x2="50" y2="1" stroke="#ccc" />
           </g>
           {tgtX !== null && <g style={{ transformOrigin: '50% 50%', transform: `rotate(${tgtX}deg)` }}>
             <line x1="45" y1="15" x2="50" y2="6" stroke="#0c3" />
             <line x1="55" y1="15" x2="50" y2="6" stroke="#0c3" />
           </g>}
           {connected && tgtX !== null && <text x={50} y={50} fill="#0c3" style={{ textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>{tgtX.toFixed(2)}</text>}
-          {connected && <text x={50} y={60} fill="#000" style={{ textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>{xPos.toFixed(2)}</text>}
+          {connected && <text x={50} y={60} fill="#ccc" style={{ textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>{xPos.toFixed(2)}</text>}
           {connected && <rect x="0" y="0" width="100" height="100" fill="transparent" stroke="transparent" onClick={onCircleClick} onMouseMove={onCircleMove} />}
           {!connected && <text x={50} y={55} fill="#f33" style={{ textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>NO CONNECTION</text>}
         </svg>
         <svg width="200" height="300" viewBox="0 0 60 100" >
-          <rect x="0" y="0" width="200" height="300" fill="#ccc" />
+          <rect x="0" y="0" width="59" height="99" fill="#333" stroke="#ccc" />
           {tgtY !== null && <g style={{ transformOrigin: '0% 50%', transform: `translateY(${tgtY * 0.52}px)` }}>
             <line x1="4" y1="50" x2="9" y2="45" stroke="#0c3" />
             <line x1="4" y1="50" x2="9" y2="55" stroke="#0c3" />
           </g>}
           <g style={{ transformOrigin: '0% 50%', transform: `translateY(${yPos * 0.52}px)` }}>
-            <line x1="1" y1="50" x2="6" y2="45" stroke="#000" />
-            <line x1="1" y1="50" x2="6" y2="55" stroke="#000" />
+            <line x1="1" y1="50" x2="6" y2="45" stroke="#ccc" />
+            <line x1="1" y1="50" x2="6" y2="55" stroke="#ccc" />
           </g>
           {connected && tgtY !== null && <text x={15} y={50} fill="#0c3" style={{ fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>{tgtY.toFixed(2)}</text>}
-          {connected && <text x={15} y={60} fill="#000" style={{ fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>{yPos.toFixed(2)}</text>}
+          {connected && <text x={15} y={60} fill="#ccc" style={{ fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>{yPos.toFixed(2)}</text>}
           {!connected && <text x={30} y={55} fill="#f33" style={{ width: 30, textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>NO CONN</text>}
           {connected && <rect x="0" y="0" width="60" height="100" fill="transparent" stroke="transparent" onClick={onRectClick} onMouseMove={onRectMove} />}
+        </svg>
+        <svg width="150" height="150" viewBox="0 0 100 100" style={{ paddingLeft: 8, cursor: 'pointer' }} onClick={stopClick}>
+          <circle cx="50" cy="50" r="40" stroke="#f33" fill="#333" strokeWidth={5} />
+          {connected && <text x={50} y={58} fill="#f33" style={{ fontFamily: 'sans-serif', textAnchor: 'middle', fontSize: 20, userSelect: 'none' }}>STOP</text>}
         </svg>
       </div>
     </div>

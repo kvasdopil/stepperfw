@@ -23,6 +23,9 @@ void setup()
   // stepper1.moveTo(24);
 
   Serial.begin(115200);
+
+  // pinMode(BUILTIN_LED, OUTPUT);
+  // digitalWrite(BUILTIN_LED, LOW);
 }
 
 String *readLine()
@@ -161,6 +164,11 @@ void loop()
   //   }
   // }
 
+  if (xMoving || yMoving)
+  {
+    // digitalWrite(BUILTIN_LED, HIGH);
+  }
+
   if (xMoving)
   {
     stepperX.run();
@@ -193,6 +201,7 @@ void loop()
 
   if (!yMoving && !xMoving)
   {
+    // digitalWrite(BUILTIN_LED, HIGH);
     delay(100);
   }
 
