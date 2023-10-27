@@ -17,7 +17,7 @@ let clients = [];
 if (path) {
   console.log('using device /dev/' + path);
 
-  cp.execSync('stty -F /dev/' + path + ' 115200 raw -echo -echoe -echok -echoctl -echoke', { stdio: 'inherit' });
+  cp.execSync('stty -F /dev/' + path + ' 9600 raw -echo -echoe -echok -echoctl -echoke', { stdio: 'inherit' });
 
   // port = new SerialPort({
   //   path: `/dev/${path}`,
@@ -30,9 +30,9 @@ if (path) {
   port = fs.createWriteStream(`/dev/${path}`, { flags: 'w' });
 
   fs.createReadStream(`/dev/${path}`, { flags: 'r' }).on('data', (data) => {
-    console.log(`> ${data.toString().trim()}`);
+    console.log('>', data);
     for (const cli of clients) {
-      cli.send(data.toString().trim());
+      cli.send(data);
     }
   });
 }
@@ -43,7 +43,7 @@ const write = (data) => {
     console.log('(port not open)');
     return;
   }
-  return new Promise(resolve => port.write(`${data}; \r\n`, resolve));
+  return new Promise(resolve => port.write(data, resolve));
 }
 
 // async function main() {
