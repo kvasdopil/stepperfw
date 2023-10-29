@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <AccelStepper.h>
+#include <FastAccelStepper.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WebServer.h>
@@ -17,10 +17,11 @@ auto const Z_DIR = 17;
 auto const A_PULSE = 5;
 auto const A_DIR = 18;
 
-AccelStepper stepperX = AccelStepper(1, X_PULSE, X_DIR);
-AccelStepper stepperY = AccelStepper(1, Y_PULSE, Y_DIR);
-AccelStepper stepperZ = AccelStepper(1, Z_PULSE, Z_DIR);
-AccelStepper stepperA = AccelStepper(1, A_PULSE, A_DIR);
+FastAccelStepperEngine engine = FastAccelStepperEngine();
+FastAccelStepper *stepperX;
+FastAccelStepper *stepperY;
+FastAccelStepper *stepperZ;
+FastAccelStepper *stepperA;
 
 auto const ssid = "Zhiruha";
 auto const password = "bnopnya2013";
@@ -47,16 +48,23 @@ void handle_status_request()
 {
   server.send(200, "application/json",
               String("{") +
-                  "\"x\":" + stepperX.currentPosition() + "," +
-                  "\"y\":" + stepperY.currentPosition() + "," +
-                  "\"z\":" + stepperZ.currentPosition() + "," +
-                  "\"a\":" + stepperA.currentPosition() + "," +
-                  "\"xrunning\":" + (int)stepperX.isRunning() + "," +
-                  "\"yrunning\":" + (int)stepperY.isRunning() + "," +
-                  "\"zrunning\":" + (int)stepperZ.isRunning() + "," +
-                  "\"arunning\":" + (int)stepperA.isRunning() + "," +
-                  "\"acc\":" + acc + "," +
-                  "\"speed\":" + speed + "}");
+                  "\"x\":" + stepperX->getCurrentPosition() + "," +
+                  "\"y\":" + stepperY->getCurrentPosition() + "," +
+                  "\"z\":" + stepperZ->getCurrentPosition() + "," +
+                  "\"a\":" + stepperA->getCurrentPosition() + "," +
+                  "\"xrunning\":" + (int)stepperX->isRunning() + "," +
+                  "\"yrunning\":" + (int)stepperY->isRunning() + "," +
+                  "\"zrunning\":" + (int)stepperZ->isRunning() + "," +
+                  "\"arunning\":" + (int)stepperA->isRunning() + "," +
+                  "\"xa\": " + stepperX->getAcceleration() + "," +
+                  "\"ya\": " + stepperY->getAcceleration() + "," +
+                  "\"za\": " + stepperZ->getAcceleration() + "," +
+                  "\"aa\": " + stepperA->getAcceleration() + "," +
+                  "\"xs\": " + stepperX->getMaxSpeedInHz() + "," +
+                  "\"ys\": " + stepperY->getMaxSpeedInHz() + "," +
+                  "\"zs\": " + stepperZ->getMaxSpeedInHz() + "," +
+                  "\"as\": " + stepperA->getMaxSpeedInHz() +
+                  "}");
 }
 
 void handle_update_request()
@@ -80,47 +88,90 @@ void handle_update_request()
   if (doc.containsKey("x"))
   {
     int x = doc["x"];
-    stepperX.moveTo(x);
+    stepperX->moveTo(x);
   }
   if (doc.containsKey("y"))
   {
     int y = doc["y"];
-    stepperY.moveTo(y);
+    stepperY->moveTo(y);
   }
   if (doc.containsKey("z"))
   {
     int z = doc["z"];
-    stepperZ.moveTo(z);
+    stepperZ->moveTo(z);
   }
   if (doc.containsKey("a"))
   {
     int a = doc["a"];
-    stepperA.moveTo(a);
+    stepperA->moveTo(a);
   }
-  if (doc.containsKey("acc"))
+  if (doc.containsKey("xa"))
   {
-    int a = doc["acc"];
-    acc = a;
-    stepperX.setAcceleration(acc);
-    stepperY.setAcceleration(acc);
-    stepperZ.setAcceleration(acc);
-    stepperA.setAcceleration(acc);
+    int xa = doc["xa"];
+    stepperX->setAcceleration(xa);
   }
-  if (doc.containsKey("speed"))
+  if (doc.containsKey("ya"))
   {
-    int s = doc["speed"];
-    speed = s;
-    stepperX.setMaxSpeed(speed);
-    stepperY.setMaxSpeed(speed);
-    stepperZ.setMaxSpeed(speed);
-    stepperA.setMaxSpeed(speed);
+    int ya = doc["ya"];
+    stepperY->setAcceleration(ya);
   }
-
+  if (doc.containsKey("za"))
+  {
+    int za = doc["za"];
+    stepperZ->setAcceleration(za);
+  }
+  if (doc.containsKey("aa"))
+  {
+    int aa = doc["aa"];
+    stepperA->setAcceleration(aa);
+  }
+  if (doc.containsKey("xs"))
+  {
+    int xs = doc["xs"];
+    stepperX->setSpeedInHz(xs);
+  }
+  if (doc.containsKey("ys"))
+  {
+    int ys = doc["ys"];
+    stepperY->setSpeedInHz(ys);
+  }
+  if (doc.containsKey("zs"))
+  {
+    int zs = doc["zs"];
+    stepperZ->setSpeedInHz(zs);
+  }
+  if (doc.containsKey("as"))
+  {
+    int as = doc["as"];
+    stepperA->setSpeedInHz(as);
+  }
   return handle_status_request();
+}
+
+void handle_stop_request()
+{
+  stepperX->forceStop();
+  stepperY->forceStop();
+  stepperZ->forceStop();
+  stepperA->forceStop();
+  server.send(200, "text/plain", "OK");
 }
 
 void setup()
 {
+  engine.init();
+  stepperX = engine.stepperConnectToPin(X_PULSE);
+  stepperX->setDirectionPin(X_DIR);
+
+  stepperY = engine.stepperConnectToPin(Y_PULSE);
+  stepperY->setDirectionPin(Y_DIR);
+
+  stepperZ = engine.stepperConnectToPin(Z_PULSE);
+  stepperZ->setDirectionPin(Z_DIR);
+
+  stepperA = engine.stepperConnectToPin(A_PULSE);
+  stepperA->setDirectionPin(A_DIR);
+
   // setup wifi on esp32
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -143,22 +194,27 @@ void setup()
     Serial.println(String("I mDNS responder started HOSTNAME:") + hostname + ".local");
   }
 
-  stepperX.setMaxSpeed(speed);
-  stepperX.setAcceleration(acc);
+  stepperX->setSpeedInHz(speed);
+  stepperX->setAcceleration(acc);
+  stepperX->setAutoEnable(true);
 
-  stepperY.setMaxSpeed(speed);
-  stepperY.setAcceleration(acc);
+  stepperY->setSpeedInHz(speed);
+  stepperY->setAcceleration(acc);
+  stepperY->setAutoEnable(true);
 
-  stepperZ.setMaxSpeed(speed);
-  stepperZ.setAcceleration(acc);
+  stepperZ->setSpeedInHz(speed);
+  stepperZ->setAcceleration(acc);
+  stepperZ->setAutoEnable(true);
 
-  stepperA.setMaxSpeed(speed);
-  stepperA.setAcceleration(acc);
+  stepperA->setSpeedInHz(speed);
+  stepperA->setAcceleration(acc);
+  stepperA->setAutoEnable(true);
 
   Serial.begin(115200);
 
   server.on("/", HTTP_GET, handle_status_request);
   server.on("/", HTTP_POST, handle_update_request);
+  server.on("/stop", HTTP_GET, handle_stop_request);
   server.begin();
 
   pinMode(BUILTIN_LED, OUTPUT);
@@ -189,12 +245,18 @@ String *readLine()
 
 const int REPORT_STATUS_EVERY_MS = 100;
 
-void reportStepperStatus(AccelStepper &stepper)
+void reportStepperStatus(FastAccelStepper *stepper)
 {
-  auto prefix = (&stepper == &stepperX) ? "X" : "Y";
-  Serial.println(String("") + prefix + "=" + stepper.currentPosition() +
-                 " A" + stepper.acceleration() +
-                 " S" + stepper.maxSpeed());
+  auto prefix = "X";
+  if (stepper == stepperY)
+    prefix = "Y";
+  if (stepper == stepperZ)
+    prefix = "Z";
+  if (stepper == stepperA)
+    prefix = "A";
+  Serial.println(String("") + prefix + "=" + stepper->getCurrentPosition() +
+                 " A" + stepper->getAcceleration() +
+                 " S" + stepper->getMaxSpeedInHz());
 }
 
 auto CHAR_X = 'X';
@@ -208,7 +270,7 @@ auto CMD_GET_STATUS = '?'; // report status
 auto CMD_SET_TARGET = '='; // set target value
 auto CMD_WIFI = 'W';       // wifi status
 
-void processCommandForServo(String line, AccelStepper &stepper)
+void processCommandForServo(String line, FastAccelStepper *stepper)
 {
   auto cmd = line.charAt(0);
   auto value = line.substring(1);
@@ -225,10 +287,7 @@ void processCommandForServo(String line, AccelStepper &stepper)
     if (tgt > 10)
     {
       acc = tgt;
-      stepperX.setAcceleration(tgt);
-      stepperY.setAcceleration(tgt);
-      stepperZ.setAcceleration(tgt);
-      stepperA.setAcceleration(tgt);
+      stepper->setAcceleration(tgt);
     }
     return;
   }
@@ -239,10 +298,7 @@ void processCommandForServo(String line, AccelStepper &stepper)
     if (tgt > 0)
     {
       speed = tgt;
-      stepperX.setMaxSpeed(speed);
-      stepperY.setMaxSpeed(speed);
-      stepperZ.setMaxSpeed(speed);
-      stepperA.setMaxSpeed(speed);
+      stepperX->setSpeedInHz(speed);
     }
     return;
   }
@@ -250,7 +306,7 @@ void processCommandForServo(String line, AccelStepper &stepper)
   if (cmd == CMD_SET_TARGET)
   {
     auto tgt = value.toInt();
-    stepper.moveTo(tgt);
+    stepper->moveTo(tgt);
     return;
   }
 }
@@ -284,48 +340,52 @@ void loop()
   // print stepper position every .5 seconds
   static unsigned long lastPrint = 0;
 
-  bool xMoving = stepperX.isRunning();
-  bool yMoving = stepperY.isRunning();
-  bool zMoving = stepperZ.isRunning();
-  bool aMoving = stepperA.isRunning();
+  if (!stepperX || !stepperY || !stepperZ || !stepperA)
+  {
+    return;
+  }
+  bool xMoving = stepperX->isRunning();
+  bool yMoving = stepperY->isRunning();
+  bool zMoving = stepperZ->isRunning();
+  bool aMoving = stepperA->isRunning();
 
   bool moving = xMoving || yMoving || zMoving || aMoving;
 
-  if (xMoving)
-  {
-    stepperX.run();
-    if (stepperX.distanceToGo() == 0)
-    {
-      lastPrint = 0; // force print when done moving
-    }
-  }
+  // if (xMoving)
+  // {
+  //   // stepperX->run();
+  //   if (stepperX->distanceToGo() == 0)
+  //   {
+  //     lastPrint = 0; // force print when done moving
+  //   }
+  // }
 
-  if (yMoving)
-  {
-    stepperY.run();
-    if (stepperY.distanceToGo() == 0)
-    {
-      lastPrint = 0; // force print when done moving
-    }
-  }
+  // if (yMoving)
+  // {
+  //   // stepperY->run();
+  //   if (stepperY->distanceToGo() == 0)
+  //   {
+  //     lastPrint = 0; // force print when done moving
+  //   }
+  // }
 
-  if (zMoving)
-  {
-    stepperZ.run();
-    if (stepperZ.distanceToGo() == 0)
-    {
-      lastPrint = 0; // force print when done moving
-    }
-  }
+  // if (zMoving)
+  // {
+  //   // stepperZ->run();
+  //   if (stepperZ->distanceToGo() == 0)
+  //   {
+  //     lastPrint = 0; // force print when done moving
+  //   }
+  // }
 
-  if (aMoving)
-  {
-    stepperA.run();
-    if (stepperA.distanceToGo() == 0)
-    {
-      lastPrint = 0; // force print when done moving
-    }
-  }
+  // if (aMoving)
+  // {
+  //   // stepperA->run();
+  //   if (stepperA->distanceToGo() == 0)
+  //   {
+  //     lastPrint = 0; // force print when done moving
+  //   }
+  // }
 
   if (moving)
   {
@@ -336,6 +396,10 @@ void loop()
         reportStepperStatus(stepperX);
       if (yMoving)
         reportStepperStatus(stepperY);
+      if (zMoving)
+        reportStepperStatus(stepperZ);
+      if (aMoving)
+        reportStepperStatus(stepperA);
     }
   }
 
