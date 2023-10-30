@@ -8,14 +8,14 @@
 auto const X_PULSE = 26;
 auto const X_DIR = 25;
 
-auto const Y_PULSE = 4;
-auto const Y_DIR = 2;
+auto const Y_PULSE = 12;
+auto const Y_DIR = 13;
 
-auto const Z_PULSE = 16;
-auto const Z_DIR = 17;
+auto const Z_PULSE = 2;
+auto const Z_DIR = 4;
 
-auto const A_PULSE = 5;
-auto const A_DIR = 18;
+auto const A_PULSE = 18;
+auto const A_DIR = 19;
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepperX;
@@ -46,6 +46,7 @@ int speed = 1500;
 
 void handle_status_request()
 {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json",
               String("{") +
                   "\"x\":" + stepperX->getCurrentPosition() + "," +
@@ -69,8 +70,10 @@ void handle_status_request()
 
 void handle_update_request()
 {
+  // server.sendHeader("Access-Control-Allow-Origin", "*");
+
   String body = server.arg("plain");
-  Serial.println("Received body: " + body);
+  // Serial.println("Received body: " + body);
 
   // Parse the JSON data
   StaticJsonDocument<256> doc;
@@ -79,7 +82,7 @@ void handle_update_request()
   // Check for parsing errors
   if (error)
   {
-    Serial.print("JSON parsing error: ");
+    Serial.print("E JSON parsing error: ");
     Serial.println(error.c_str());
     server.send(400, "text/plain", "Bad Request");
     return;
@@ -88,11 +91,13 @@ void handle_update_request()
   if (doc.containsKey("x"))
   {
     int x = doc["x"];
+    Serial.println("Moving X to " + String(x));
     stepperX->moveTo(x);
   }
   if (doc.containsKey("y"))
   {
     int y = doc["y"];
+    Serial.println("Moving Y to " + String(y));
     stepperY->moveTo(y);
   }
   if (doc.containsKey("z"))
@@ -108,6 +113,7 @@ void handle_update_request()
   if (doc.containsKey("xa"))
   {
     int xa = doc["xa"];
+    Serial.println("Setting X acceleration to " + String(xa));
     stepperX->setAcceleration(xa);
   }
   if (doc.containsKey("ya"))
@@ -128,6 +134,7 @@ void handle_update_request()
   if (doc.containsKey("xs"))
   {
     int xs = doc["xs"];
+    Serial.println("Setting X speed to " + String(xs));
     stepperX->setSpeedInHz(xs);
   }
   if (doc.containsKey("ys"))
@@ -150,11 +157,28 @@ void handle_update_request()
 
 void handle_stop_request()
 {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+
   stepperX->forceStop();
   stepperY->forceStop();
   stepperZ->forceStop();
   stepperA->forceStop();
   server.send(200, "text/plain", "OK");
+}
+
+void handle_not_found()
+{
+  if (server.method() == HTTP_OPTIONS)
+  {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+    server.send(200);
+  }
+  else
+  {
+    server.send(405, "text/plain", "Method Not Allowed");
+  }
 }
 
 void setup()
@@ -215,6 +239,7 @@ void setup()
   server.on("/", HTTP_GET, handle_status_request);
   server.on("/", HTTP_POST, handle_update_request);
   server.on("/stop", HTTP_GET, handle_stop_request);
+  server.onNotFound(handle_not_found);
   server.begin();
 
   pinMode(BUILTIN_LED, OUTPUT);
@@ -350,42 +375,6 @@ void loop()
   bool aMoving = stepperA->isRunning();
 
   bool moving = xMoving || yMoving || zMoving || aMoving;
-
-  // if (xMoving)
-  // {
-  //   // stepperX->run();
-  //   if (stepperX->distanceToGo() == 0)
-  //   {
-  //     lastPrint = 0; // force print when done moving
-  //   }
-  // }
-
-  // if (yMoving)
-  // {
-  //   // stepperY->run();
-  //   if (stepperY->distanceToGo() == 0)
-  //   {
-  //     lastPrint = 0; // force print when done moving
-  //   }
-  // }
-
-  // if (zMoving)
-  // {
-  //   // stepperZ->run();
-  //   if (stepperZ->distanceToGo() == 0)
-  //   {
-  //     lastPrint = 0; // force print when done moving
-  //   }
-  // }
-
-  // if (aMoving)
-  // {
-  //   // stepperA->run();
-  //   if (stepperA->distanceToGo() == 0)
-  //   {
-  //     lastPrint = 0; // force print when done moving
-  //   }
-  // }
 
   if (moving)
   {
