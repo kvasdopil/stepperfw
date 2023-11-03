@@ -138,7 +138,7 @@ const monitorAxis = async (id, cb) => {
 
       if (angle !== prev) {
         // console.log('axis', id, angle);
-        cb(angle / 80000 * 360, id);
+        cb(angle / PULSES_PER_ROTATION * 360, id);
         prev = angle;
       }
     } catch (e) {
@@ -160,9 +160,11 @@ const read = async (id, numBytes) => {
   return res;
 }
 
+const PULSES_PER_ROTATION = 200 * 16 * 37;// 200 * 16 * 25;
+
 // max speeed = 0x7f aka 127
 const rotate = async (id, speed, position) => {
-  let pos = Math.abs(Math.round(position * 80000 / 360));
+  let pos = Math.abs(Math.round(position * PULSES_PER_ROTATION / 360));
   let ok = 0;
   const signBit = (position > 0) ? 0b10000000 : 0;
   await lock();
@@ -186,14 +188,14 @@ const rotate = async (id, speed, position) => {
 let lastX = null;
 const moveW = async (x) => {
   const axis = 1;
-  if (lastX === null) lastX = (await getPulses(axis)) / 80000 * 360;
+  if (lastX === null) lastX = (await getPulses(axis)) / PULSES_PER_ROTATION * 360;
   await rotate(axis, 120, x - lastX);
   lastX = x;
 }
 let lastY = null;
 const moveY = async (y) => {
   const axis = 0;
-  if (lastY === null) lastY = (await getPulses(axis)) / 80000 * 360;
+  if (lastY === null) lastY = (await getPulses(axis)) / PULSES_PER_ROTATION * 360;
   await rotate(axis, 120, y - lastY);
   lastY = y;
 }
@@ -293,6 +295,10 @@ const App = () => {
     setOffX(xPos);
     setOffW(wPos);
     setOffY(yPos);
+    setTgtR(rPos);
+    setTgtX(xPos);
+    setTgtW(wPos);
+    setTgtY(yPos);
   };
 
   return (
