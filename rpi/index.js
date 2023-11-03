@@ -3,6 +3,10 @@ const app = require('express')();
 const static = require('express-static');
 const expressWs = require('express-ws')(app);
 const fs = require('fs');
+const yaml = require('yaml');
+const cors = require('cors');
+
+const acc = require('./acc.js');
 
 const path = fs.readdirSync('/dev/').filter(p => p.startsWith('ttyUSB')).shift();
 
@@ -61,6 +65,14 @@ app.ws('/ws', (ws, req) => {
   ws.on('message', (msg) => {
     write(msg);
   });
+});
+
+app.use(cors());
+app.get('/acc', async (req, res) => {
+  const puck = await acc.connect('EE:01:91:49:AD:A3');
+  const raw = await puck('acc.read();');
+  const parsed = yaml.parse(raw);
+  res.json(parsed);
 });
 
 app.use(static('public'));

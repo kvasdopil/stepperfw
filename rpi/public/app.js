@@ -8,6 +8,25 @@ ws.onerror = () => {
   console.log('error');
 }
 
+const acc = async () => {
+  try {
+    const res = await fetch(`http://${host}/acc`, {
+      method: 'GET',
+    });
+    return res.json();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+const monitorAcc = async (cb) => {
+  while (true) {
+    await delay(1000);
+    const res = await acc();
+    if (res && res.x !== undefined && res.y !== undefined && res.z !== undefined) cb(res);
+  }
+}
+
 const servo = async (msg) => {
   try {
     const res = await fetch('http://servos.local', {
@@ -214,6 +233,7 @@ const App = () => {
   const [rPos, setRPos] = useState(0);
   const [wPos, setWPos] = useState(0);
   const [connected, setConnected] = useState(ws.readyState === 1);
+  const [acc, setAcc] = useState({ x: 0, y: 0, z: 0 });
 
   useEffect(() => {
     const onClose = () => {
@@ -237,6 +257,10 @@ const App = () => {
       monitorServos((r, x) => {
         setXPos(x - offX);
         setRPos(r - offR);
+      });
+
+      monitorAcc(val => {
+        setAcc(val);
       });
       // send("X?");
       // send("Y?");
@@ -312,6 +336,12 @@ const App = () => {
           {connected && <Button title="STOP" color="#f33" onClick={stopClick} />}
           {connected && <Button title="zero" color="#ccc" onClick={zeroClick} />}
         </div>
+      </div>
+      <div>
+        <svg width={200} height={200} viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="49" fill="#333" stroke="#ccc" />
+          <line x1={50} y1={50} x2={acc.x * 50 + 50} y2={acc.y * 50 + 50} stroke="#ccc" />
+        </svg>
       </div>
     </div>
   );

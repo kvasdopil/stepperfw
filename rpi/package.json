@@ -1,15 +1,18 @@
 {
   "scripts": {
-    "deploy": "scp -r package* Dockerfile index.js public lexa@robotarm:/home/lexa/app && npm run build && npm run stop && npm run restart",
+    "deploy": "scp -r package* Dockerfile index.js acc.js public lexa@robotarm:/home/lexa/app && npm run build && npm run stop && npm run restart",
     "build": "ssh lexa@robotarm 'cd app && docker build -t robotarm .'",
     "stop": "ssh lexa@robotarm 'docker stop robotarm 2>/dev/null || true; docker rm robotarm  2>/dev/null || true'",
-    "restart": "ssh lexa@robotarm 'docker run --restart=always -d --name=robotarm --privileged -p 80:80 robotarm'"
+    "restart": "ssh lexa@robotarm 'docker run --restart=always -d --name=robotarm --privileged --volume /run/dbus/system_bus_socket:/run/dbus/system_bus_socket -p 80:80 robotarm'"
   },
   "dependencies": {
     "express": "^4.18.2",
     "express-static": "^1.2.6",
     "express-ws": "^5.0.2",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "dbus-native": "^0.4.0",
+    "yaml": "^2.3.4",
+    "cors": "^2.8.5"
   }
 }
