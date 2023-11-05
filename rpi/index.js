@@ -68,11 +68,16 @@ app.ws('/ws', (ws, req) => {
 });
 
 app.use(cors());
-app.get('/acc', async (req, res) => {
-  const puck = await acc.connect('EE:01:91:49:AD:A3');
-  const raw = await puck('acc.read();');
-  const parsed = yaml.parse(raw);
-  res.json(parsed);
+app.get('/acc/:mac', async (req, res) => {
+  try {
+    const mac = req.params.mac;
+    const puck = await acc.connect(mac);
+    const raw = await puck('acc.read();');
+    const parsed = yaml.parse(raw);
+    res.json(parsed);
+  } catch (e) {
+    res.status(500).send(e.toString());
+  };
 });
 
 app.use(static('public'));

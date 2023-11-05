@@ -8,9 +8,40 @@ ws.onerror = () => {
   console.log('error');
 }
 
-const acc = async () => {
+const ACC_W = 'EE:01:91:49:AD:A3';
+const ACC_Y = 'E2:84:F1:3D:EC:DD';
+
+function yprl(a) {
+  const x = a.x;
+  const y = a.y;
+  const z = a.z;
+
+  // Calculate the length
+  const length = Math.sqrt(x * x + y * y + z * z);
+
+  // Calculate the pitch angle (in degrees)
+  const pitchRad = Math.atan2(-z, y);
+  const pitchDeg = (180 / Math.PI) * pitchRad;
+
+  // Calculate the yaw angle (in degrees)
+  const yawRad = Math.atan2(y, x);
+  const yawDeg = (180 / Math.PI) * yawRad;
+
+  // Calculate the roll angle (in degrees)
+  const rollRad = Math.atan2(y, z);
+  const rollDeg = (180 / Math.PI) * rollRad;
+
+  return {
+    len: length,
+    pitch: pitchDeg,
+    yaw: yawDeg,
+    roll: rollDeg,
+  };
+}
+
+const acc = async (mac) => {
   try {
-    const res = await fetch(`http://${host}/acc`, {
+    const res = await fetch(`http://${host}/acc/${mac}`, {
       method: 'GET',
     });
     return res.json();
@@ -19,10 +50,10 @@ const acc = async () => {
   }
 }
 
-const monitorAcc = async (cb) => {
+const monitorAcc = async (mac, cb) => {
   while (true) {
     await delay(1000);
-    const res = await acc();
+    const res = await acc(mac);
     if (res && res.x !== undefined && res.y !== undefined && res.z !== undefined) cb(res);
   }
 }
@@ -172,7 +203,7 @@ const read = async (id, numBytes) => {
     while (msgQueue.length) msgQueue.shift();
     throw new Error('timeout');
   }
-  const t = setTimeout(abort, 1000);
+  const t = setTimeout(abort, 3000);
   const [rid, ...res] = await new Promise(resolve => msgQueue.push([numBytes + 1, resolve]));
   clearTimeout(t);
   if (rid !== 0xe0 + id) throw new Error('invalid id');
@@ -213,8 +244,9 @@ const moveW = async (x) => {
 }
 let lastY = null;
 const moveY = async (y) => {
+  // y = -y;
   const axis = 0;
-  if (lastY === null) lastY = (await getPulses(axis)) / PULSES_PER_ROTATION * 360;
+  if (lastY === null) lastY = ((await getPulses(axis)) / PULSES_PER_ROTATION * 360);
   await rotate(axis, 120, y - lastY);
   lastY = y;
 }
@@ -233,7 +265,8 @@ const App = () => {
   const [rPos, setRPos] = useState(0);
   const [wPos, setWPos] = useState(0);
   const [connected, setConnected] = useState(ws.readyState === 1);
-  const [acc, setAcc] = useState({ x: 0, y: 0, z: 0 });
+  const [accY, setAccY] = useState(0);
+  const [accW, setAccW] = useState(0);
 
   useEffect(() => {
     const onClose = () => {
@@ -259,9 +292,14 @@ const App = () => {
         setRPos(r - offR);
       });
 
-      monitorAcc(val => {
-        setAcc(val);
-      });
+      // monitorAcc(ACC_Y, val => {
+      //   setAccY(val);
+      // });
+
+      // monitorAcc(ACC_W, val => {
+      //   setAccW(val);
+      // });
+
       // send("X?");
       // send("Y?");
     }
@@ -325,24 +363,81 @@ const App = () => {
     setTgtY(yPos);
   };
 
+  const homeClick = async () => {
+    const Y = await acc(ACC_Y);
+    const W = await acc(ACC_W);
+    const aY = yprl(Y).yaw + 90;
+    const aW = yprl(W).yaw + 90;
+    setAccY(aY);
+    setAccW(aW);
+
+    console.log('acc', aW);
+
+    const diff = aW - wPos;
+    console.log('diff', diff);
+
+    // reset target, and set offset to current position
+    setTgtW(wPos - aW);
+    setOffW(wPos - aW);
+
+    setTimeout(() => {
+      console.log('move', wPos);
+      moveW(wPos - aW);
+    }, 300);
+    // moveW(wPos - aW);
+    // setOffW();
+    // setTgtW(offW - diff);
+    // moveW(offW - diff);
+    // setOffW(-angle);
+    // setTgtW(0);
+
+    // setWPos(- (yprlY.yaw + 90));
+
+    // setOffY(0);
+    // setTgtY(0);
+    // setYPos((yprlW.yaw + 90));
+    // moveY(0);
+    // moveW(0);
+  };
+
+  const updateAccW = async () => {
+    try {
+      const aW = await acc(ACC_W);
+      console.log('aw', aW);
+      if (aW) setAccW(yprl(aW).yaw + 90);
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
+  const updateAccY = async () => {
+    try {
+      const aY = await acc(ACC_Y);
+      console.log('ay', aY);
+      if (aY) setAccY(yprl(aY).yaw + 90);
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
+
   return (
     <div>
       <div style={{ display: "flex" }}>
         <GaugeRound connected={connected} target={tgtX - offX} value={xPos - offX} onChange={pos => setTgtX(pos + offX)} onMove={pos => moveX(pos + offX)} />
-        <GaugeSquare connected={connected} target={tgtY - offY} value={yPos - offY} onChange={pos => setTgtY(pos + offY)} onMove={pos => moveY(pos + offY)} />
-        <GaugeSquare connected={connected} target={tgtW - offW} value={wPos - offW} onChange={pos => setTgtW(pos + offW)} onMove={pos => moveW(pos + offW)} />
+        <GaugeRound connected={connected} target={tgtW - offW} value={wPos - offW} onChange={pos => setTgtW(pos + offW)} onMove={pos => moveW(pos + offW)} />
+        <GaugeRound connected={connected} target={(wPos - offW) + (tgtY - offY)} value={(wPos - offW) + (yPos - offY)} onChange={pos => setTgtY((pos + offY) - (wPos - offW))} onMove={pos => moveY((pos + offY) - (wPos - offW))} />
         <GaugeRound connected={connected} target={tgtR - offR} value={rPos - offR} onChange={pos => setTgtR(pos + offR)} onMove={pos => moveR(pos + offR)} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {connected && <Button title="STOP" color="#f33" onClick={stopClick} />}
           {connected && <Button title="zero" color="#ccc" onClick={zeroClick} />}
+          {connected && <Button title="HOME" color="#ccc" onClick={homeClick} />}
         </div>
       </div>
-      <div>
-        <svg width={200} height={200} viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="49" fill="#333" stroke="#ccc" />
-          <line x1={50} y1={50} x2={acc.x * 50 + 50} y2={acc.y * 50 + 50} stroke="#ccc" />
-        </svg>
-      </div>
+      {<div>
+        <GaugeRound connected target={null} value={accW} onChange={updateAccW} onMove={() => { }} />
+        <GaugeRound connected target={null} value={accY} onChange={updateAccY} onMove={() => { }} />
+      </div>}
     </div>
   );
 };
