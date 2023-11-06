@@ -429,38 +429,70 @@ const App = () => {
   const [selected, setSelected] = useState(null);
   // const selected = null;
 
-  const [tgt, setTgt] = useState(null);
+  // const [tgt, setTgt] = useState(null);
 
   const zoom = 200 / 500;
+
+  const solve = ({ x, y }) => {
+    if (!window.target) return [];
+    if (!window.solver) return [];
+    // console.log('xy', x, -y)
+    window.target.setX(x);
+    window.target.setY(-y);
+    window.solver.update();
+    return window.solver.angleChains[0];
+  }
 
   const [down, setDown] = useState(false);
   const onMouseDown = (e) => {
     const { offsetX, offsetY } = e.nativeEvent;
-    setTgt({ x: offsetX * zoom - 100, y: offsetY * zoom - 200 });
+    const x = offsetX * zoom - 100;
+    const y = offsetY * zoom - 100;
+    // setTgt({ x, y });
     setDown(true);
+    const [, W, Y] = solve({ x, y });
+    if (!W || !Y) return;
   }
 
   const onMouseMove = (e) => {
     if (!down) return;
     const { offsetX, offsetY } = e.nativeEvent;
-    setTgt({ x: offsetX * zoom - 100, y: offsetY * zoom - 200 });
+    const x = offsetX * zoom - 100;
+    const y = offsetY * zoom - 100;
+    console.log('xy', x, y);
+    // setTgt({ x, y });
+    const [z, W, Y] = solve({ x, y });
+    console.log(z, W, Y)
+    if (!W || !Y) return;
+    setTgtW(-W + 180);
+    setTgtY(W - Y);
   }
 
   const onMouseUp = (e) => {
     setDown(false);
   }
 
-  let TW = 0;
-  let TY = 0;
-  if (tgt && window.target) {
-    console.log('xy', tgt.x, - tgt.y)
-    window.target.setX(tgt.x);
-    window.target.setY(- tgt.y);
-    window.solver.update();
-    TW = window.solver.angleChains[0][1];
-    TY = window.solver.angleChains[0][2];
+  const renderClick = (e) => {
+    if (e.buttons === 0) return;
+    const bounding = e.target.getBoundingClientRect();
+
+    const click = window.cast(e.clientX - bounding.left, e.clientY - bounding.top);
+    if (!click) return;
+
+    target.setX(click[0]);
+    target.setY(click[0]);
+
+    const [, W, Y] = solve({ x: click[0], y: click[1] });
+    if (!W || !Y) return;
+    setTgtW(-W + 180);
+    setTgtY(W - Y);
   }
-  console.log(TW, TY);
+
+
+  // if (tgt && window.target) {
+
+  // }
+  // console.log(TW, TY);
 
   return (
     <div>
@@ -475,13 +507,13 @@ const App = () => {
           {connected && <Button title="HOME" color="#ccc" onClick={homeClick} />}
         </div>
       </div>
-      <div>
+      <div style={{ display: 'flex' }}>
         <svg width={500} height={500} viewBox="0 0 200 200" onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp}>
           <g transform="translate(100 200)">
             <rect x={-20} y={-20} width={40} height={10} stroke="#ccc" strokeWidth="1" fill="#282828" />
-            <g transform={`translate(0, -30) rotate(${180 - TW} 0 0)`}>
+            <g transform={`translate(0, -30) rotate(${(tgtW - offW)} 0 0)`}>
               <rect x={-10} y={0} width={20} height={50} stroke="none" fill="#00cc0033" onClick={() => setSelected(1)} />
-              <g transform={`translate(0 50) rotate(${-TY} 0 0)`}>
+              <g transform={`translate(0 50) rotate(${(tgtY - offY)} 0 0)`}>
                 <rect x={-10} y={0} width={20} height={50} stroke="none" fill="#00cc0033" onClick={() => setSelected(2)} />
                 <circle cx="0" cy="0" r="10" fill="#006600" />
               </g>
@@ -498,11 +530,12 @@ const App = () => {
 
           </g>
         </svg>
+        <span id="render" onMouseMove={renderClick}></span>
       </div>
-      {<div>
+      <div>
         <GaugeRound connected target={null} value={accW} onChange={updateAccW} onMove={() => { }} />
         <GaugeRound connected target={null} value={accY} onChange={updateAccY} onMove={() => { }} />
-      </div>}
+      </div>
     </div>
   );
 };
