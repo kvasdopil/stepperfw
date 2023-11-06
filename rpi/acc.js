@@ -39,7 +39,7 @@ const init = async (mac) => {
 
   return (data) => new Promise(resolve => {
     reader.once('data', resolve);
-    write(Buffer.from(data + '\r\n'));
+    write(Buffer.from(data + '\r\n')).catch(e => console.log('write error', e));
   });
 }
 

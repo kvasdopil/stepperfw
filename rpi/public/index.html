@@ -9,13 +9,28 @@
   <script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
   <title>Robot</title>
   <script src="./gauges.js" type="text/babel"></script>
+  <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    { 
+      "imports": { 
+        "three": "./jsm/libs/three.module.js", 
+        "fik": "./fik/src/FIK.js"
+      }
+    }
+  </script>
   <!-- react-script -->
 </head>
 
 <body style="background-color: #282828;">
   <div id="root"></div>
-  <script src="./app.js" type="text/babel">
+  <script type="module-shim">
+    import * as FIK from 'fik';
+    import * as THREE from 'three';
+    window.FIK = FIK;
+    window.THREE = THREE;
+    import './ik.js';
   </script>
+  <script src="./app.js" type="text/babel"></script>
 </body>
 
 </html>
