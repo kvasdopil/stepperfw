@@ -239,8 +239,11 @@ let lastX = null;
 const moveW = async (x) => {
   const axis = 1;
   if (lastX === null) lastX = (await getPulses(axis)) / PULSES_PER_ROTATION * 360;
-  await rotate(axis, 120, x - lastX);
+  const delta = x - lastX;
+  await rotate(axis, 120, delta);
   lastX = x;
+  await rotate(0, 120, delta);
+  lastY += delta;
 }
 let lastY = null;
 const moveY = async (y) => {
@@ -384,20 +387,6 @@ const App = () => {
       console.log('move', wPos);
       moveW(wPos - aW);
     }, 300);
-    // moveW(wPos - aW);
-    // setOffW();
-    // setTgtW(offW - diff);
-    // moveW(offW - diff);
-    // setOffW(-angle);
-    // setTgtW(0);
-
-    // setWPos(- (yprlY.yaw + 90));
-
-    // setOffY(0);
-    // setTgtY(0);
-    // setYPos((yprlW.yaw + 90));
-    // moveY(0);
-    // moveW(0);
   };
 
   const updateAccW = async () => {
@@ -420,13 +409,14 @@ const App = () => {
     }
   }
 
+  const W = wPos - offW;
 
   return (
     <div>
       <div style={{ display: "flex" }}>
         <GaugeRound connected={connected} target={tgtX - offX} value={xPos - offX} onChange={pos => setTgtX(pos + offX)} onMove={pos => moveX(pos + offX)} />
-        <GaugeRound connected={connected} target={tgtW - offW} value={wPos - offW} onChange={pos => setTgtW(pos + offW)} onMove={pos => moveW(pos + offW)} />
-        <GaugeRound connected={connected} target={(wPos - offW) + (tgtY - offY)} value={(wPos - offW) + (yPos - offY)} onChange={pos => setTgtY((pos + offY) - (wPos - offW))} onMove={pos => moveY((pos + offY) - (wPos - offW))} />
+        <GaugeRound inverse connected={connected} target={tgtW - offW} value={W} onChange={pos => setTgtW(pos + offW)} onMove={pos => moveW(pos + offW)} />
+        <GaugeRound connected={connected} target={W + tgtY - offY} value={W + yPos - offY} onChange={pos => setTgtY(pos + offY - W)} onMove={pos => moveY(pos + offY - W)} />
         <GaugeRound connected={connected} target={tgtR - offR} value={rPos - offR} onChange={pos => setTgtR(pos + offR)} onMove={pos => moveR(pos + offR)} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {connected && <Button title="STOP" color="#f33" onClick={stopClick} />}
