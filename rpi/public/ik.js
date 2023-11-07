@@ -51,16 +51,68 @@ const initIk = () => {
   scene.add(tgt);
   tgt.position.copy(target);
 
-  const G1 = new THREE.Group();
+
   const base = new THREE.Mesh(new THREE.CylinderBufferGeometry(20, 20, 10, 32), new THREE.MeshStandardMaterial({ color: 'white' }));
-  G1.add(base);
+  scene.add(base);
+  base.position.y = -5;
 
-  const joint1 = new THREE.Mesh(new THREE.CylinderBufferGeometry(10, 10, 10, 32), new THREE.MeshStandardMaterial({ color: 'blue' }));
-  joint1.position.y = 10;
-  joint1.rotation.x = Math.PI * 0.5;
-  G1.add(joint1);
+  const TW = new THREE.Group();
+  TW.position.y = 10;
 
-  scene.add(G1);
+  const W = new THREE.Group();
+  W.position.y = 10;
+
+  const green = new THREE.MeshStandardMaterial({ color: 'green' });
+  const white = new THREE.MeshStandardMaterial({ color: 'white', opacity: 0.5, transparent: true });
+
+  const TjointW = new THREE.Mesh(new THREE.CylinderBufferGeometry(8, 8, 30, 32), green);
+  TjointW.rotation.x = Math.PI * 0.5;
+  TW.add(TjointW);
+
+  const jointW = new THREE.Mesh(new THREE.CylinderBufferGeometry(10, 10, 30, 32), white);
+  jointW.rotation.x = Math.PI * 0.5;
+  W.add(jointW);
+
+  const TlegW = new THREE.Mesh(new THREE.CylinderBufferGeometry(8, 8, 50, 32), green);
+  TlegW.position.y = 20;
+  TW.add(TlegW);
+
+  const legW = new THREE.Mesh(new THREE.CylinderBufferGeometry(10, 10, 50, 32), white);
+  legW.position.y = 20;
+  W.add(legW);
+
+  window.TW = TW;
+  window.W = W;
+
+  const TY = new THREE.Group();
+  TY.position.y = 50;
+  TW.add(TY);
+
+  const Y = new THREE.Group();
+  Y.position.y = 50;
+  W.add(Y);
+
+  const TjointY = new THREE.Mesh(new THREE.CylinderBufferGeometry(8, 8, 30, 32), green);
+  TjointY.rotation.x = Math.PI * 0.5;
+  TY.add(TjointY);
+
+  const jointY = new THREE.Mesh(new THREE.CylinderBufferGeometry(10, 10, 30, 32), white);
+  jointY.rotation.x = Math.PI * 0.5;
+  Y.add(jointY);
+
+  const TlegY = new THREE.Mesh(new THREE.CylinderBufferGeometry(8, 8, 50, 32), green);
+  TlegY.position.y = 20;
+  TY.add(TlegY);
+
+  const legY = new THREE.Mesh(new THREE.CylinderBufferGeometry(10, 10, 50, 32), white);
+  legY.position.y = 20;
+  Y.add(legY);
+
+  window.TY = TY;
+  window.Y = Y;
+
+  scene.add(W);
+  scene.add(TW);
 
   var chain = new FIK.Chain2D();
 

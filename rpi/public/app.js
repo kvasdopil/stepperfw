@@ -484,10 +484,25 @@ const App = () => {
 
     const [, W, Y] = solve({ x: click[0], y: click[1] });
     if (!W || !Y) return;
-    setTgtW(-W + 180);
-    setTgtY(W - Y);
+    setTgtW(-W);
+    setTgtY(Y - W);
+
+    window.TW.rotation.z = W / 180 * Math.PI;
+    window.TY.rotation.z = (Y - W) / 180 * Math.PI;
   }
 
+  const renderGo = (e) => {
+    //  console.log('go');
+    moveW(tgtW + offW);
+    moveY(tgtY + offY);
+  }
+
+  useEffect(() => {
+    if (window.W && window.Y) {
+      window.W.rotation.z = -1 * (wPos - offW) / 180 * Math.PI;
+      window.Y.rotation.z = (yPos - offY) / 180 * Math.PI;
+    }
+  }, [wPos, yPos]);
 
   // if (tgt && window.target) {
 
@@ -511,9 +526,9 @@ const App = () => {
         <svg width={500} height={500} viewBox="0 0 200 200" onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp}>
           <g transform="translate(100 200)">
             <rect x={-20} y={-20} width={40} height={10} stroke="#ccc" strokeWidth="1" fill="#282828" />
-            <g transform={`translate(0, -30) rotate(${(tgtW - offW)} 0 0)`}>
+            <g transform={`translate(0, -30) rotate(${(180 + tgtW - offW)} 0 0)`}>
               <rect x={-10} y={0} width={20} height={50} stroke="none" fill="#00cc0033" onClick={() => setSelected(1)} />
-              <g transform={`translate(0 50) rotate(${(tgtY - offY)} 0 0)`}>
+              <g transform={`translate(0 50) rotate(${-1 * (tgtY - offY)} 0 0)`}>
                 <rect x={-10} y={0} width={20} height={50} stroke="none" fill="#00cc0033" onClick={() => setSelected(2)} />
                 <circle cx="0" cy="0" r="10" fill="#006600" />
               </g>
@@ -530,7 +545,7 @@ const App = () => {
 
           </g>
         </svg>
-        <span id="render" onMouseMove={renderClick}></span>
+        <span id="render" onMouseMove={renderClick} onMouseDown={renderClick} onMouseUp={renderGo}></span>
       </div>
       <div>
         <GaugeRound connected target={null} value={accW} onChange={updateAccW} onMove={() => { }} />
