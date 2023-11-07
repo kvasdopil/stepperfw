@@ -125,31 +125,6 @@ const getPulses = async (id) => {
   return (a << 24) + (b << 16) + (c << 8) + d;
 }
 
-// const getEncoder = async (id) => {
-//   await lock();
-//   send([0xe0 + id, GET_ENCODER]);
-//   const [c, d] = await read(id, 2);
-//   unlock();
-//   return ((c << 8) + d) / 65536 * 360;
-// }
-
-// const getPosition = async (id) => {
-//   await lock();
-//   send([0xe0 + id, GET_ANGLE]);
-//   const [a, b, c, d] = await read(id, 4);
-//   unlock();
-//   // console.log(a, b, c, d);
-//   return ((a << 24) + (b << 16) + (c << 8) + d) / 65536 * 360;
-// }
-
-// const setAccel = async (id, accel) => {
-//   await lock();
-//   send([0xe0 + id, SET_ACCEL, (accel >> 8) & 0xff, accel & 0xff]);
-//   const [ok] = await read(id, 1);
-//   unlock();
-//   return ok === 1;
-// }
-
 const stop = async (id) => {
   await lock();
   send([0xe0 + id, STOP]);
@@ -246,28 +221,7 @@ const getSpeed = (delta) => {
 }
 
 let lastX = null;
-const moveW = async (x) => {
-  const axis = 1;
-  if (lastX === null) lastX = (await getPulses(axis)) / PULSES_PER_ROTATION * 360;
-  const delta = x - lastX;
-  const speed = getSpeed(delta);
-  await rotate(axis, speed, delta);
-  lastX = x;
-  // await rotate(0, speed, delta);
-  // lastY += delta;
-}
 let lastY = null;
-
-const moveY = async (y) => {
-  // y = -y;
-  const axis = 0;
-  if (lastY === null) lastY = ((await getPulses(axis)) / PULSES_PER_ROTATION * 360);
-  const delta = y - lastY;
-  const speed = getSpeed(delta);
-  // console.log('delta', delta, 'speed', speed);
-  await rotate(axis, speed, delta);
-  lastY = y;
-}
 
 const moveX = async (w) => {
   servo({ y: Math.round(w / 360 * 40000) });
@@ -278,6 +232,29 @@ const moveR = async (r) => {
 }
 
 const App = () => {
+  const moveW = async (x) => {
+    const axis = 1;
+    if (lastX === null) lastX = (await getPulses(axis)) / PULSES_PER_ROTATION * 360;
+    const delta = x - lastX + offW;
+    const speed = getSpeed(delta);
+    await rotate(axis, speed, delta);
+    lastX = x + offW;
+  }
+
+  const moveY = async (y) => {
+    const axis = 0;
+    if (lastY === null) lastY = ((await getPulses(axis)) / PULSES_PER_ROTATION * 360);
+    const delta = y - lastY + offY;
+    const speed = getSpeed(delta);
+    await rotate(axis, speed, delta);
+    lastY = y + offY;
+  }
+
+  const [offX, setOffX] = useState(0);
+  const [offR, setOffR] = useState(0);
+  const [offY, setOffY] = useState(0);
+  const [offW, setOffW] = useState(0);
+
   const [xPos, setXPos] = useState(0);
   const [yPos, setYPos] = useState(0);
   const [rPos, setRPos] = useState(0);
@@ -285,6 +262,9 @@ const App = () => {
   const [connected, setConnected] = useState(ws.readyState === 1);
   const [accY, setAccY] = useState(0);
   const [accW, setAccW] = useState(0);
+
+  const Y = yPos - offY;
+  const W = wPos - offW;
 
   useEffect(() => {
     const onClose = () => {
@@ -309,17 +289,6 @@ const App = () => {
         setXPos(x - offX);
         setRPos(r - offR);
       });
-
-      // monitorAcc(ACC_Y, val => {
-      //   setAccY(val);
-      // });
-
-      // monitorAcc(ACC_W, val => {
-      //   setAccW(val);
-      // });
-
-      // send("X?");
-      // send("Y?");
     }
     let buffer = [];
     const onMessage = async (msg) => {
@@ -357,11 +326,6 @@ const App = () => {
   const [tgtR, setTgtR] = useState(null);
   const [tgtW, setTgtW] = useState(null);
 
-  const [offX, setOffX] = useState(0);
-  const [offR, setOffR] = useState(0);
-  const [offY, setOffY] = useState(0);
-  const [offW, setOffW] = useState(0);
-
   const stopClick = async () => {
     fetch('http://servos.local/stop').catch(e => console.error(e));
     await stop(0);
@@ -370,32 +334,6 @@ const App = () => {
     lastY = null;
   }
 
-  const homeClick = async () => {
-    // const Y = await acc(ACC_Y);
-    // const W = await acc(ACC_W);
-    // const aY = yprl(Y).yaw + 90;
-    // const aW = yprl(W).yaw + 90;
-    // setAccY(aY);
-    // setAccW(aW);
-
-    // console.log('acc', aW);
-
-    // const diff = aW - wPos;
-    // console.log('diff', diff);
-
-    // // reset target, and set offset to current position
-    // setTgtW(wPos - aW);
-    // setOffW(wPos - aW);
-
-    // setTimeout(() => {
-    //   console.log('move', wPos);
-    setTgtW(offW);
-    setTgtY(offY);
-    moveW(offW);
-    moveY(offY);
-    // }, 300);
-  };
-
   const updateAccW = async () => {
     try {
       const W = await acc(ACC_W);
@@ -403,7 +341,6 @@ const App = () => {
 
       const aW = yprl(W).yaw + 90;
       setAccW(aW);
-      setTgtW(wPos - aW);
       setOffW(wPos - aW);
     } catch (e) {
       console.log(e);
@@ -417,60 +354,40 @@ const App = () => {
 
       const aY = (yprl(Y).yaw + 90);
       setAccY(aY);
-      setTgtY(yPos - aY);
-      setOffY(yPos - aY);
+      setOffY(yPos - aY - W);
     } catch (e) {
       console.log(e);
     }
   }
 
-  const W = wPos - offW;
-
-  const [selected, setSelected] = useState(null);
-  // const selected = null;
-
-  // const [tgt, setTgt] = useState(null);
-
-  const zoom = 200 / 500;
-
   const solve = ({ x, y }) => {
     if (!window.target) return [];
     if (!window.solver) return [];
-    // console.log('xy', x, -y)
     window.target.setX(x);
     window.target.setY(-y);
     window.solver.update();
     return window.solver.angleChains[0];
   }
 
-  const [down, setDown] = useState(false);
-  const onMouseDown = (e) => {
-    const { offsetX, offsetY } = e.nativeEvent;
-    const x = offsetX * zoom - 100;
-    const y = offsetY * zoom - 100;
-    // setTgt({ x, y });
-    setDown(true);
+  const setTarget = (x, y) => {
+    target.setX(x);
+    target.setY(y);
+
     const [, W, Y] = solve({ x, y });
     if (!W || !Y) return;
+    setTgtW(-W);
+    setTgtY(Y - W);
+
+    return [-W, Y - W];
   }
 
-  const onMouseMove = (e) => {
-    if (!down) return;
-    const { offsetX, offsetY } = e.nativeEvent;
-    const x = offsetX * zoom - 100;
-    const y = offsetY * zoom - 100;
-    console.log('xy', x, y);
-    // setTgt({ x, y });
-    const [z, W, Y] = solve({ x, y });
-    console.log(z, W, Y)
-    if (!W || !Y) return;
-    setTgtW(-W + 180);
-    setTgtY(W - Y);
-  }
+  const homeClick = async () => {
+    const [w, y] = setTarget(0, -120);
+    console.log(w, y);
 
-  const onMouseUp = (e) => {
-    setDown(false);
-  }
+    moveW(w);
+    moveY(y);
+  };
 
   const renderClick = (e) => {
     if (e.buttons === 0) return;
@@ -479,77 +396,46 @@ const App = () => {
     const click = window.cast(e.clientX - bounding.left, e.clientY - bounding.top);
     if (!click) return;
 
-    target.setX(click[0]);
-    target.setY(click[0]);
-
-    const [, W, Y] = solve({ x: click[0], y: click[1] });
-    if (!W || !Y) return;
-    setTgtW(-W);
-    setTgtY(Y - W);
-
-    window.TW.rotation.z = W / 180 * Math.PI;
-    window.TY.rotation.z = (Y - W) / 180 * Math.PI;
+    setTarget(click[0], click[1]);
   }
 
   const renderGo = (e) => {
-    //  console.log('go');
-    moveW(tgtW + offW);
-    moveY(tgtY + offY);
+    moveW(tgtW);
+    moveY(tgtY);
   }
 
   useEffect(() => {
     if (window.W && window.Y) {
-      window.W.rotation.z = -1 * (wPos - offW) / 180 * Math.PI;
-      window.Y.rotation.z = (yPos - offY) / 180 * Math.PI;
+      window.W.rotation.z = -1 * (W) / 180 * Math.PI;
+      window.Y.rotation.z = (Y) / 180 * Math.PI;
     }
-  }, [wPos, yPos]);
+  }, [W, Y]);
 
-  // if (tgt && window.target) {
-
-  // }
-  // console.log(TW, TY);
+  useEffect(() => {
+    if (window.TW && window.TY) {
+      window.TW.rotation.z = -1 * (tgtW) / 180 * Math.PI;
+      window.TY.rotation.z = (tgtY) / 180 * Math.PI;
+    }
+  }, [tgtW, tgtY]);
 
   return (
     <div>
       <div style={{ display: "flex" }}>
         <GaugeRound connected={connected} target={tgtX - offX} value={xPos - offX} onChange={pos => setTgtX(pos + offX)} onMove={pos => moveX(pos + offX)} />
-        <GaugeRound inverse connected={connected} target={tgtW - offW} value={W} onChange={pos => setTgtW(pos + offW)} onMove={pos => moveW(pos + offW)} />
-        <GaugeRound connected={connected} target={tgtY - offY} value={yPos - offY} onChange={pos => setTgtY(pos + offY)} onMove={pos => moveY(pos + offY)} />
+        <GaugeRound inverse connected={connected} target={tgtW} value={W} onChange={pos => setTgtW(pos)} onMove={pos => moveW(pos)} />
+        <GaugeRound connected={connected} target={tgtY} value={Y} onChange={pos => setTgtY(pos)} onMove={pos => moveY(pos)} />
         <GaugeRound connected={connected} target={tgtR - offR} value={rPos - offR} onChange={pos => setTgtR(pos + offR)} onMove={pos => moveR(pos + offR)} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {connected && <Button title="STOP" color="#f33" onClick={stopClick} />}
-          {/* {connected && <Button title="zero" color="#ccc" onClick={zeroClick} />} */}
           {connected && <Button title="HOME" color="#ccc" onClick={homeClick} />}
         </div>
       </div>
       <div style={{ display: 'flex' }}>
-        <svg width={500} height={500} viewBox="0 0 200 200" onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp}>
-          <g transform="translate(100 200)">
-            <rect x={-20} y={-20} width={40} height={10} stroke="#ccc" strokeWidth="1" fill="#282828" />
-            <g transform={`translate(0, -30) rotate(${(180 + tgtW - offW)} 0 0)`}>
-              <rect x={-10} y={0} width={20} height={50} stroke="none" fill="#00cc0033" onClick={() => setSelected(1)} />
-              <g transform={`translate(0 50) rotate(${-1 * (tgtY - offY)} 0 0)`}>
-                <rect x={-10} y={0} width={20} height={50} stroke="none" fill="#00cc0033" onClick={() => setSelected(2)} />
-                <circle cx="0" cy="0" r="10" fill="#006600" />
-              </g>
-              <circle cx="0" cy="0" r="10" fill="#006600" />
-            </g>
-            <g transform={`translate(0, -30) rotate(${180 + W} 0 0)`}>
-              <rect x={-10} y={0} width={20} height={50} stroke="#ccc" strokeWidth="1" fill={selected === 1 ? "#ffffffcc" : "#ffffff10"} onClick={() => setSelected(1)} />
-              <g transform={`translate(0 50) rotate(${-1 * (yPos - offY)} 0 0)`}>
-                <rect x={-10} y={0} width={20} height={50} stroke="#ccc" strokeWidth="1" fill={selected === 2 ? "#ffffffcc" : "#ffffff10"} onClick={() => setSelected(2)} />
-                <circle cx="0" cy="0" r="10" stroke="#ccc" strokeWidth="1" fill="#282828" />
-              </g>
-              <circle cx="0" cy="0" r="10" stroke="#ccc" strokeWidth="1" fill="#282828" />
-            </g>
-
-          </g>
-        </svg>
         <span id="render" onMouseMove={renderClick} onMouseDown={renderClick} onMouseUp={renderGo}></span>
       </div>
       <div>
         <GaugeRound connected target={null} value={accW} onChange={updateAccW} onMove={() => { }} />
-        <GaugeRound connected target={null} value={accY} onChange={updateAccY} onMove={() => { }} />
+        <GaugeRound connected target={null} value={accW + accY} onChange={updateAccY} onMove={() => { }} />
       </div>
     </div>
   );
