@@ -334,27 +334,23 @@ const App = () => {
     lastY = null;
   }
 
-  const updateAccW = async () => {
+  const calibrateAcc = async () => {
     try {
-      const W = await acc(ACC_W);
-      if (!W) return;
+      const aw = await acc(ACC_W);
+      if (!aw) return;
 
-      const aW = yprl(W).yaw + 90;
+      const ay = await acc(ACC_Y);
+      if (!ay) return;
+
+      const aW = yprl(aw).yaw + 90;
       setAccW(aW);
-      setOffW(wPos - aW);
-    } catch (e) {
-      console.log(e);
-    }
-  }
 
-  const updateAccY = async () => {
-    try {
-      const Y = await acc(ACC_Y);
-      if (!Y) return;
-
-      const aY = (yprl(Y).yaw + 90);
+      const aY = yprl(ay).yaw + 90;
       setAccY(aY);
-      setOffY(yPos - aY - W);
+
+      setOffW(wPos - aW);
+
+      setOffY(yPos - aY - aW);
     } catch (e) {
       console.log(e);
     }
@@ -434,8 +430,8 @@ const App = () => {
         <span id="render" onMouseMove={renderClick} onMouseDown={renderClick} onMouseUp={renderGo}></span>
       </div>
       <div>
-        <GaugeRound connected target={null} value={accW} onChange={updateAccW} onMove={() => { }} />
-        <GaugeRound connected target={null} value={accW + accY} onChange={updateAccY} onMove={() => { }} />
+        <GaugeRound connected target={null} value={accW} onChange={calibrateAcc} onMove={() => { }} />
+        <GaugeRound connected target={null} value={accW + accY} onChange={calibrateAcc} onMove={() => { }} />
       </div>
     </div>
   );
