@@ -58,20 +58,20 @@ const monitorAcc = async (mac, cb) => {
   }
 }
 
-const servo = async (msg) => {
-  try {
-    const res = await fetch('http://servos.local', {
-      method: 'POST',
-      body: JSON.stringify(msg),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    return res.json();
-  } catch (e) {
-    console.error(e);
-  }
-}
+// const servo = async (msg) => {
+//   try {
+//     const res = await fetch('http://servos.local', {
+//       method: 'POST',
+//       body: JSON.stringify(msg),
+//       headers: {
+//         'Content-Type': 'application/json'
+//       }
+//     });
+//     return res.json();
+//   } catch (e) {
+//     console.error(e);
+//   }
+// }
 
 const send = (msg) => {
   // console.log('>', msg);
@@ -132,27 +132,27 @@ const stop = async (id) => {
   unlock();
 }
 
-const monitorServos = async (cb) => {
-  let prevx = null;
-  let prevy = null;
-  while (true) {
-    await delay(200);
-    try {
-      const res = await fetch('http://servos.local');
-      const { x, y } = await res.json();
+// const monitorServos = async (cb) => {
+//   let prevx = null;
+//   let prevy = null;
+//   while (true) {
+//     await delay(200);
+//     try {
+//       const res = await fetch('http://servos.local');
+//       const { x, y } = await res.json();
 
-      if (x !== prevx || y !== prevy) {
-        // console.log('axis', id, angle);
-        cb(x / 40000 * 360, y / 40000 * 360);
-        prevx = x;
-        prevy = y;
-      }
-    } catch (e) {
-      console.error(e);
-      await delay(1000);
-    }
-  }
-}
+//       if (x !== prevx || y !== prevy) {
+//         // console.log('axis', id, angle);
+//         cb(x / 40000 * 360, y / 40000 * 360);
+//         prevx = x;
+//         prevy = y;
+//       }
+//     } catch (e) {
+//       console.error(e);
+//       await delay(1000);
+//     }
+//   }
+// }
 
 const monitorAxis = async (id, cb) => {
   let prev = null;
@@ -220,8 +220,10 @@ const getSpeed = (delta) => {
   return 100;
 }
 
-let lastX = null;
+let lastW = null;
 let lastY = null;
+let lastX = null;
+let lastR = null;
 
 const moveX = async (w) => {
   servo({ y: Math.round(w / 360 * 40000) });
@@ -234,11 +236,11 @@ const moveR = async (r) => {
 const App = () => {
   const moveW = async (x) => {
     const axis = 1;
-    if (lastX === null) lastX = (await getPulses(axis)) / PULSES_PER_ROTATION * 360;
-    const delta = x - lastX + offW;
+    if (lastW === null) lastW = (await getPulses(axis)) / PULSES_PER_ROTATION * 360;
+    const delta = x - lastW + offW;
     const speed = getSpeed(delta);
     await rotate(axis, speed, delta);
-    lastX = x + offW;
+    lastW = x + offW;
   }
 
   const moveY = async (y) => {
@@ -248,6 +250,24 @@ const App = () => {
     const speed = getSpeed(delta);
     await rotate(axis, speed, delta);
     lastY = y + offY;
+  }
+
+  const moveX = async (x) => {
+    const axis = 2;
+    if (lastX === null) lastX = ((await getPulses(axis)) / PULSES_PER_ROTATION * 360);
+    const delta = x - lastX + offX;
+    const speed = getSpeed(delta);
+    await rotate(axis, speed, delta);
+    lastX = x + offX;
+  }
+
+  const moveR = async (r) => {
+    const axis = 3;
+    if (lastR === null) lastR = ((await getPulses(axis)) / PULSES_PER_ROTATION * 360);
+    const delta = r - lastR + offR;
+    const speed = getSpeed(delta);
+    await rotate(axis, speed, delta);
+    lastR = r + offR;
   }
 
   const [offX, setOffX] = useState(0);
@@ -285,10 +305,22 @@ const App = () => {
         });
       }
 
-      monitorServos((r, x) => {
-        setXPos(x - offX);
-        setRPos(r - offR);
-      });
+      if (await checkUartEnabled(2)) {
+        monitorAxis(2, (angle) => {
+          setXPos(angle);
+        });
+      }
+
+      if (await checkUartEnabled(3)) {
+        monitorAxis(3, (angle) => {
+          setRPos(angle);
+        });
+      }
+
+      // monitorServos((r, x) => {
+      //   setXPos(x - offX);
+      //   setRPos(r - offR);
+      // });
     }
     let buffer = [];
     const onMessage = async (msg) => {
@@ -327,10 +359,12 @@ const App = () => {
   const [tgtW, setTgtW] = useState(null);
 
   const stopClick = async () => {
-    fetch('http://servos.local/stop').catch(e => console.error(e));
+    // fetch('http://servos.local/stop').catch(e => console.error(e));
     await stop(0);
     await stop(1);
-    lastX = null;
+    await stop(2);
+    await stop(3);
+    lastW = null;
     lastY = null;
   }
 
