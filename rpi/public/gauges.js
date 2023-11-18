@@ -1,5 +1,5 @@
 
-const GaugeRound = ({ connected, target, value, onChange, onMove }) => {
+const GaugeRound = ({ connected, target, value, onChange, onMove, loading = false }) => {
   const click2degrees = (e) => {
     const { left, top, width, height } = e.target.getBoundingClientRect();
     const dx = (e.clientX - left) / width - 0.5;
@@ -21,18 +21,19 @@ const GaugeRound = ({ connected, target, value, onChange, onMove }) => {
 
   return <svg width="300" height="300" viewBox="0 0 100 100" >
     <circle cx="50" cy="50" r="49" fill="#333" stroke="#ccc" />
-    <g style={{ transformOrigin: '50% 50%', transform: `rotate(${value}deg)` }}>
+    {(value !== null && !loading) && <g style={{ transformOrigin: '50% 50%', transform: `rotate(${value}deg)` }}>
       <line x1="45" y1="10" x2="50" y2="1" stroke="#ccc" />
       <line x1="55" y1="10" x2="50" y2="1" stroke="#ccc" />
-    </g>
-    {target !== null && <g style={{ transformOrigin: '50% 50%', transform: `rotate(${target}deg)` }}>
+    </g>}
+    {(target !== null && !loading) && <g style={{ transformOrigin: '50% 50%', transform: `rotate(${target}deg)` }}>
       <line x1="45" y1="15" x2="50" y2="6" stroke="#0c3" />
       <line x1="55" y1="15" x2="50" y2="6" stroke="#0c3" />
     </g>}
-    {connected && target !== null && <text x={50} y={50} fill="#0c3" style={{ textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>{target.toFixed(2)}</text>}
-    {connected && <text x={50} y={60} fill="#ccc" style={{ textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>{value.toFixed(2)}</text>}
+    {(connected && target !== null) && <text x={50} y={50} fill="#0c3" style={{ textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>{target.toFixed(2)}</text>}
+    {(value !== null && !loading) && connected && <text x={50} y={60} fill="#ccc" style={{ textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>{value.toFixed(2)}</text>}
     {connected && <rect x="0" y="0" width="100" height="100" fill="transparent" stroke="transparent" onClick={onCircleClick} onMouseMove={onCircleMove} />}
     {!connected && <text x={50} y={55} fill="#f33" style={{ textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>NO CONNECTION</text>}
+    {(loading || value === null) && <text x={50} y={55} fill="#ccc" style={{ textAnchor: 'middle', fontFamily: 'sans-serif', fontSize: 10, userSelect: 'none' }}>NO DATA</text>}
   </svg>
 }
 

@@ -4,14 +4,15 @@ const initIk = () => {
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(500, 500);
+
+  const w = 500;
+  const h = 500;
+  renderer.setSize(w, h);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setClearColor(0x222322, 1);
   document.querySelector('#render').appendChild(renderer.domElement);
 
-  const w = 500;
-  const h = 500;
   const camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 2000);
 
   const l = new THREE.DirectionalLight(0xFFFFFF, 1)//new THREE.SpotLight( 0xffffff, 1, 0, Math.PI / 2 );
@@ -21,13 +22,14 @@ const initIk = () => {
   l.castShadow = true;
   const s = l.shadow
   s.mapSize.setScalar(2048);
-  s.camera.top = s.camera.right = 150
-  s.camera.bottom = s.camera.left = -150
+  s.camera.top = s.camera.right = 200
+  s.camera.bottom = s.camera.left = -200
   s.camera.near = 100
   s.camera.far = 400
   s.bias = -0.0001
 
-  camera.position.set(0, 30, 210);
+  const cameraOff = 70;
+  camera.position.set(0, cameraOff, 250);
   l.position.set(40, 100, 200);
   // controler.update();
 
@@ -40,6 +42,7 @@ const initIk = () => {
 
   const grid = new THREE.GridHelper(300, 16, 0x0A0B0A, 0x070807);
   grid.position.z = -5;
+  grid.position.y = cameraOff;
   grid.rotation.x = -Math.PI * 0.5;
   scene.add(grid);
 
@@ -111,6 +114,33 @@ const initIk = () => {
   window.TY = TY;
   window.Y = Y;
 
+  const TR = new THREE.Group();
+  TR.position.y = 50;
+  TY.add(TR);
+
+  const R = new THREE.Group();
+  R.position.y = 50;
+  Y.add(R);
+
+  const TjointR = new THREE.Mesh(new THREE.CylinderBufferGeometry(8, 8, 30, 32), green);
+  TjointR.rotation.x = Math.PI * 0.5;
+  TR.add(TjointR);
+
+  const jointR = new THREE.Mesh(new THREE.CylinderBufferGeometry(10, 10, 30, 32), white);
+  jointR.rotation.x = Math.PI * 0.5;
+  R.add(jointR);
+
+  const TlegR = new THREE.Mesh(new THREE.CylinderBufferGeometry(8, 8, 10, 32), green);
+  TlegR.position.y = 10;
+  TR.add(TlegR);
+
+  const legR = new THREE.Mesh(new THREE.CylinderBufferGeometry(10, 10, 10, 32), white);
+  legR.position.y = 10;
+  R.add(legR);
+
+  window.R = R;
+  window.TR = TR;
+
   scene.add(W);
   scene.add(TW);
 
@@ -134,6 +164,9 @@ const initIk = () => {
   // Create and add the third bone
   const secondLength = 50;
   chain.addConsecutiveBone(new FIK.V2(0, 1), secondLength, 145, 0);
+
+  const thirdLength = 20;
+  chain.addConsecutiveBone(new FIK.V2(0, 1), thirdLength, 90, 90);
 
   // Finally, add the chain to the structure
   solver.add(chain, tgt.position, true);
@@ -159,7 +192,7 @@ const initIk = () => {
     raycaster.setFromCamera(mouse, camera);
     const pt = raycaster.intersectObjects([ground]).pop();
     if (!pt) return null;
-    return [pt.point.x, pt.point.y - 50]
+    return [pt.point.x, pt.point.y - (50 + cameraOff)]
   }
 }
 

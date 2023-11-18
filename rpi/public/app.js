@@ -220,9 +220,9 @@ const App = () => {
   const [rPos, setRPos] = useState(0);
   const [wPos, setWPos] = useState(0);
   const [connected, setConnected] = useState(ws.readyState === 1);
-  const [accY, setAccY] = useState(0);
-  const [accW, setAccW] = useState(0);
-  const [accR, setAccR] = useState(0);
+  const [accY, setAccY] = useState(null);
+  const [accW, setAccW] = useState(null);
+  const [accR, setAccR] = useState(null);
 
   const Y = yPos - offY;
   const W = wPos - offW;
@@ -312,26 +312,29 @@ const App = () => {
 
   const calibrateAcc = async () => {
     try {
+      setAccR(null);
+      setAccW(null);
+      setAccY(null);
+
       const aw = await acc(ACC_W);
       if (!aw) return;
+
+      const aW = yprl(aw).yaw + 90;
+      setAccW(aW);
+      setOffW(wPos - aW);
 
       const ay = await acc(ACC_Y);
       if (!ay) return;
 
+      const aY = yprl(ay).yaw + 90;
+      setAccY(aY);
+      setOffY(yPos - aY - aW);
+
       const ar = await acc(ACC_R);
       if (!ar) return;
 
-      const aW = yprl(aw).yaw + 90;
-      setAccW(aW);
-
-      const aY = yprl(ay).yaw + 90;
-      setAccY(aY);
-
       const aR = yprl(ar).yaw + 90;
       setAccR(aR);
-
-      setOffW(wPos - aW);
-      setOffY(yPos - aY - aW);
       setOffR(rPos - aY - aW - aR);
     } catch (e) {
       console.log(e);
@@ -351,20 +354,21 @@ const App = () => {
     target.setX(x);
     target.setY(y);
 
-    const [, W, Y] = solve({ x, y });
-    if (!W || !Y) return;
+    const [, W, Y, R] = solve({ x, y });
+    if (!W || !Y || !R) return;
     setTgtW(-W);
     setTgtY(Y - W);
+    setTgtR(Y - R)
 
-    return [-W, Y - W];
+    return [-W, Y - W, Y - R];
   }
 
   const homeClick = async () => {
-    const [w, y] = setTarget(0, -120);
-    console.log(w, y);
+    const [w, y, r] = setTarget(0, -150);
 
     moveW(w);
     moveY(y);
+    moveR(r);
   };
 
   const renderClick = (e) => {
@@ -380,13 +384,14 @@ const App = () => {
   const renderGo = (e) => {
     moveW(tgtW);
     moveY(tgtY);
+    moveR(tgtR);
   }
 
   useEffect(() => {
     if (window.W && window.Y && window.R) {
       window.W.rotation.z = -1 * (W) / 180 * Math.PI;
       window.Y.rotation.z = (Y) / 180 * Math.PI;
-      window.R.rotation.z = (R) / 180 * Math.PI;
+      window.R.rotation.z = -1 * (R) / 180 * Math.PI;
     }
   }, [W, Y, R]);
 
@@ -394,7 +399,7 @@ const App = () => {
     if (window.TW && window.TY && window.TR) {
       window.TW.rotation.z = -1 * (tgtW) / 180 * Math.PI;
       window.TY.rotation.z = (tgtY) / 180 * Math.PI;
-      window.TR.rotation.z = (tgtR) / 180 * Math.PI;
+      window.TR.rotation.z = -1 * (tgtR) / 180 * Math.PI;
     }
   }, [tgtW, tgtY, tgtR]);
 
@@ -414,9 +419,9 @@ const App = () => {
         <span id="render" onMouseMove={renderClick} onMouseDown={renderClick} onMouseUp={renderGo}></span>
       </div>
       <div>
-        <GaugeRound connected target={null} value={accW} onChange={calibrateAcc} onMove={() => { }} />
-        <GaugeRound connected target={null} value={accW + accY} onChange={calibrateAcc} onMove={() => { }} />
-        <GaugeRound connected target={null} value={accW + accY + accR} onChange={calibrateAcc} onMove={() => { }} />
+        <GaugeRound connected loading={accW === null} target={null} value={accW} onChange={calibrateAcc} onMove={() => { }} />
+        <GaugeRound connected loading={accY === null} target={null} value={accW + accY} onChange={calibrateAcc} onMove={() => { }} />
+        <GaugeRound connected loading={accR === null} target={null} value={accW + accY + accR} onChange={calibrateAcc} onMove={() => { }} />
       </div>
     </div>
   );
