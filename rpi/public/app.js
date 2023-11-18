@@ -10,6 +10,11 @@ ws.onerror = () => {
 
 const ACC_W = 'EE:01:91:49:AD:A3';
 const ACC_Y = 'E2:84:F1:3D:EC:DD';
+const ACC_R = 'F6:68:59:8D:FE:51';
+
+// Vrpm = (speed × 30000)/(Mstep × 200)(RPM) 1.8°motor
+const Mstep = 16;
+
 
 function yprl(a) {
   const x = a.x;
@@ -58,27 +63,20 @@ const monitorAcc = async (mac, cb) => {
   }
 }
 
-// const servo = async (msg) => {
-//   try {
-//     const res = await fetch('http://servos.local', {
-//       method: 'POST',
-//       body: JSON.stringify(msg),
-//       headers: {
-//         'Content-Type': 'application/json'
-//       }
-//     });
-//     return res.json();
-//   } catch (e) {
-//     console.error(e);
-//   }
-// }
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+let locked = false;
+const send = async (id, msg, returnLength = 1) => {
+  while (locked) await delay(100);
+  locked = true;
 
-const send = (msg) => {
-  // console.log('>', msg);
   if (msg instanceof Array)
-    ws.send(new Uint8Array(msg));
+    ws.send(new Uint8Array([0xe0 + id, ...msg]));
   else
-    ws.send(msg);
+    ws.send([0xe0 + id, ...msg]);
+  const res = await read(id, returnLength);
+
+  locked = false;
+  return res;
 }
 
 const Placeholder = () => <div style={{ display: 'inline-block', width: 100 }} />;
@@ -87,72 +85,26 @@ const Btn = ({ children, ...rest }) => <button style={{ width: 100, height: 100 
 const accel = 3000;
 const speed = 6000;
 
-// const GET_ENCODER = 0x30;
-// const GET_ANGLE = 0x36;
 const GET_PULSES = 0x33;
-// const GET_ENABLED = 0x3a;
 const GET_SERIAL_ENABLED = 0xf3;
 const ROTATE = 0xfd;
 const STOP = 0xf7;
-// const SET_ACCEL = 0xa4; // 00 80 04
 
 const msgQueue = [];
 
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-let locked = false;
-const lock = async () => {
-  while (locked) await delay(100);
-  locked = true;
-}
-const unlock = () => {
-  locked = false;
-}
-
 const checkUartEnabled = async (id) => {
-  await lock();
-  send([0xe0 + id, GET_SERIAL_ENABLED, 0x01]);
-  const [res] = await read(id, 1);
-  unlock();
+  const [res] = await send(id, [GET_SERIAL_ENABLED, 0x01], 1);
   return res === 1;
 }
 
 const getPulses = async (id) => {
-  await lock();
-  send([0xe0 + id, GET_PULSES]);
-  const [a, b, c, d] = await read(id, 4);
-  unlock();
+  const [a, b, c, d] = await send(id, [GET_PULSES], 4);
   return (a << 24) + (b << 16) + (c << 8) + d;
 }
 
 const stop = async (id) => {
-  await lock();
-  send([0xe0 + id, STOP]);
-  await read(id, 1);
-  unlock();
+  await send(id, [STOP], 1);
 }
-
-// const monitorServos = async (cb) => {
-//   let prevx = null;
-//   let prevy = null;
-//   while (true) {
-//     await delay(200);
-//     try {
-//       const res = await fetch('http://servos.local');
-//       const { x, y } = await res.json();
-
-//       if (x !== prevx || y !== prevy) {
-//         // console.log('axis', id, angle);
-//         cb(x / 40000 * 360, y / 40000 * 360);
-//         prevx = x;
-//         prevy = y;
-//       }
-//     } catch (e) {
-//       console.error(e);
-//       await delay(1000);
-//     }
-//   }
-// }
 
 const monitorAxis = async (id, cb) => {
   let prev = null;
@@ -185,34 +137,30 @@ const read = async (id, numBytes) => {
   return res;
 }
 
-const PULSES_PER_ROTATION = 200 * 16 * 37;// 200 * 16 * 25;
+const PULSES_PER_ROTATION = 200 * 8 * 37;// 200 * 16 * 25;
 
 // max speeed = 0x7f aka 127
 const rotate = async (id, speed, position) => {
   let pos = Math.abs(Math.round(position * PULSES_PER_ROTATION / 360));
   let ok = 0;
   const signBit = (position > 0) ? 0b10000000 : 0;
-  await lock();
   while (pos > 0) {
     const p = pos > 0xffff ? 0xffff : pos;
     pos -= p;
     console.log('rotate', pos, id, signBit, speed, p & 0xff, p >> 8);
-    send([
-      0xe0 + id,
+    const [lastok] = await send(id, [
       ROTATE,
       signBit + speed,
       0xff && (p >> 8), p & 0xff
-    ]);
-    const [lastok] = await read(id, 1);
+    ], 1);
     ok = lastok;
   }
-  unlock();
   return ok === 1;
 }
 
 const getSpeed = (delta) => {
   const d = Math.abs(delta);
-  if (d > 90) return 122;
+  if (d > 90) return 126;
   if (d > 60) return 121;
   if (d > 45) return 120;
   if (d > 30) return 115;
@@ -224,14 +172,6 @@ let lastW = null;
 let lastY = null;
 let lastX = null;
 let lastR = null;
-
-const moveX = async (w) => {
-  servo({ y: Math.round(w / 360 * 40000) });
-}
-
-const moveR = async (r) => {
-  servo({ x: Math.round(r / 360 * 40000) });
-}
 
 const App = () => {
   const moveW = async (x) => {
@@ -282,9 +222,11 @@ const App = () => {
   const [connected, setConnected] = useState(ws.readyState === 1);
   const [accY, setAccY] = useState(0);
   const [accW, setAccW] = useState(0);
+  const [accR, setAccR] = useState(0);
 
   const Y = yPos - offY;
   const W = wPos - offW;
+  const R = rPos - offR;
 
   useEffect(() => {
     const onClose = () => {
@@ -376,15 +318,21 @@ const App = () => {
       const ay = await acc(ACC_Y);
       if (!ay) return;
 
+      const ar = await acc(ACC_R);
+      if (!ar) return;
+
       const aW = yprl(aw).yaw + 90;
       setAccW(aW);
 
       const aY = yprl(ay).yaw + 90;
       setAccY(aY);
 
-      setOffW(wPos - aW);
+      const aR = yprl(ar).yaw + 90;
+      setAccR(aR);
 
+      setOffW(wPos - aW);
       setOffY(yPos - aY - aW);
+      setOffR(rPos - aY - aW - aR);
     } catch (e) {
       console.log(e);
     }
@@ -435,18 +383,20 @@ const App = () => {
   }
 
   useEffect(() => {
-    if (window.W && window.Y) {
+    if (window.W && window.Y && window.R) {
       window.W.rotation.z = -1 * (W) / 180 * Math.PI;
       window.Y.rotation.z = (Y) / 180 * Math.PI;
+      window.R.rotation.z = (R) / 180 * Math.PI;
     }
-  }, [W, Y]);
+  }, [W, Y, R]);
 
   useEffect(() => {
-    if (window.TW && window.TY) {
+    if (window.TW && window.TY && window.TR) {
       window.TW.rotation.z = -1 * (tgtW) / 180 * Math.PI;
       window.TY.rotation.z = (tgtY) / 180 * Math.PI;
+      window.TR.rotation.z = (tgtR) / 180 * Math.PI;
     }
-  }, [tgtW, tgtY]);
+  }, [tgtW, tgtY, tgtR]);
 
   return (
     <div>
@@ -454,7 +404,7 @@ const App = () => {
         <GaugeRound connected={connected} target={tgtX - offX} value={xPos - offX} onChange={pos => setTgtX(pos + offX)} onMove={pos => moveX(pos + offX)} />
         <GaugeRound inverse connected={connected} target={tgtW} value={W} onChange={pos => setTgtW(pos)} onMove={pos => moveW(pos)} />
         <GaugeRound connected={connected} target={tgtY} value={Y} onChange={pos => setTgtY(pos)} onMove={pos => moveY(pos)} />
-        <GaugeRound connected={connected} target={tgtR - offR} value={rPos - offR} onChange={pos => setTgtR(pos + offR)} onMove={pos => moveR(pos + offR)} />
+        <GaugeRound connected={connected} target={tgtR} value={R} onChange={pos => setTgtR(pos)} onMove={pos => moveR(pos)} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {connected && <Button title="STOP" color="#f33" onClick={stopClick} />}
           {connected && <Button title="HOME" color="#ccc" onClick={homeClick} />}
@@ -466,6 +416,7 @@ const App = () => {
       <div>
         <GaugeRound connected target={null} value={accW} onChange={calibrateAcc} onMove={() => { }} />
         <GaugeRound connected target={null} value={accW + accY} onChange={calibrateAcc} onMove={() => { }} />
+        <GaugeRound connected target={null} value={accW + accY + accR} onChange={calibrateAcc} onMove={() => { }} />
       </div>
     </div>
   );
