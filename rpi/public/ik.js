@@ -49,7 +49,7 @@ const initIk = () => {
   const solver = new FIK.Structure2D(scene, THREE);
   const target = new THREE.Vector3(0, 50, 0);
 
-  const tgt = new THREE.Mesh(new THREE.SphereBufferGeometry(3, 8, 8), new THREE.MeshStandardMaterial({ color: 'red' }));
+  const tgt = new THREE.Mesh(new THREE.SphereBufferGeometry(4, 8, 8), new THREE.MeshStandardMaterial({ color: 'red' }));
   tgt.castShadow = true;
   scene.add(tgt);
   tgt.position.copy(target);
@@ -193,6 +193,41 @@ const initIk = () => {
     const pt = raycaster.intersectObjects([ground]).pop();
     if (!pt) return null;
     return [pt.point.x, pt.point.y - (50 + cameraOff)]
+  }
+
+  const allPoints = [];
+  const pointsMaterial = new THREE.MeshStandardMaterial({ color: 'white' });
+  window.updatePoints = (points) => {
+    console.log('updatePoints', points);
+    for (const p of allPoints) {
+      scene.remove(p);
+    }
+    for (const p of points) {
+      const pp = new THREE.Mesh(new THREE.SphereBufferGeometry(3, 8, 8), pointsMaterial);
+      pp.castShadow = true;
+      pp.position.x = p.x;
+      pp.position.y = -p.y;
+      scene.add(pp);
+      allPoints.push(pp);
+      console.log('updatePoints', points);
+      window.lastPt = pp;
+      window.scene = scene;
+
+      // const txt = new THREE.TextGeometry({
+      //   text: 'Hello world', 
+      //   font: 
+      //   size: 80,
+      //   height: 5,
+      //   curveSegments: 12,
+      //   bevelEnabled: true,
+      //   bevelThickness: 10,
+      //   bevelSize: 8,
+      //   bevelOffset: 0,
+      //   bevelSegments: 5
+      // });
+      // scene.add(txt);
+      // allPoints.push(txt);
+    }
   }
 }
 

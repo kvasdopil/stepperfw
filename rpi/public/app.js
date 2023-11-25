@@ -12,10 +12,6 @@ const ACC_W = 'EE:01:91:49:AD:A3';
 const ACC_Y = 'E2:84:F1:3D:EC:DD';
 const ACC_R = 'F6:68:59:8D:FE:51';
 
-// Vrpm = (speed × 30000)/(Mstep × 200)(RPM) 1.8°motor
-const Mstep = 16;
-
-
 function yprl(a) {
   const x = a.x;
   const y = a.y;
@@ -49,19 +45,21 @@ const acc = async (mac) => {
     const res = await fetch(`http://${host}/acc/${mac}`, {
       method: 'GET',
     });
-    return res.json();
+    const [x, y, z] = (await res.json()).map(val => val / 16384);
+    console.log(x, y, z);
+    return { x, y, z };
   } catch (e) {
     console.error(e);
   }
 }
 
-const monitorAcc = async (mac, cb) => {
-  while (true) {
-    await delay(1000);
-    const res = await acc(mac);
-    if (res && res.x !== undefined && res.y !== undefined && res.z !== undefined) cb(res);
-  }
-}
+// const monitorAcc = async (mac, cb) => {
+//   while (true) {
+//     await delay(1000);
+//     const res = await acc(mac);
+//     if (res && res.x !== undefined && res.y !== undefined && res.z !== undefined) cb(res);
+//   }
+// }
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 let locked = false;
@@ -350,7 +348,10 @@ const App = () => {
     return window.solver.angleChains[0];
   }
 
+  const [tgt, setTgt] = useState(null);
+
   const setTarget = (x, y) => {
+    setTgt({ x, y });
     target.setX(x);
     target.setY(y);
 
@@ -364,12 +365,22 @@ const App = () => {
   }
 
   const homeClick = async () => {
+    setTgt({ x: 0, y: -150 });
     const [w, y, r] = setTarget(0, -150);
 
     moveW(w);
     moveY(y);
     moveR(r);
   };
+
+  const gotoPoint = async (p) => {
+    setTgt(p);
+    const [w, y, r] = setTarget(p.x, p.y);
+
+    moveW(w);
+    moveY(y);
+    moveR(r);
+  }
 
   const renderClick = (e) => {
     if (e.buttons === 0) return;
@@ -403,6 +414,37 @@ const App = () => {
     }
   }, [tgtW, tgtY, tgtR]);
 
+  const [points, setPoints] = useState([]);
+  const addPoint = () => {
+    setPoints([...points, tgt]);
+  };
+
+  const deletePoint = (i) => {
+    setPoints(points.filter((_, j) => i !== j));
+  };
+
+  useEffect(() => {
+    if (window.updatePoints) window.updatePoints(points);
+  }, [points]);
+
+  const [clawOpen, setClawOpen] = useState(null);
+  const claw = 'http://192.168.147.122';
+  useEffect(async () => {
+    const res = await fetch(claw, { timeout: 1000 });
+    const { open } = await res.json();
+    setClawOpen(open);
+  }, [setClawOpen]);
+
+  const clawClick = async () => {
+    try {
+      const res = await fetch(clawOpen ? `${claw}/close` : `${clas}/open`, { timeout: 1000 });
+      const { open } = await res.json();
+      setClawOpen(open);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   return (
     <div>
       <div style={{ display: "flex" }}>
@@ -413,10 +455,19 @@ const App = () => {
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {connected && <Button title="STOP" color="#f33" onClick={stopClick} />}
           {connected && <Button title="HOME" color="#ccc" onClick={homeClick} />}
+          {connected && clawOpen !== null && <Button title={clawOpen ? "GRAB" : "OPEN"} color="#33f" onClick={clawClick} />}
         </div>
       </div>
       <div style={{ display: 'flex' }}>
         <span id="render" onMouseMove={renderClick} onMouseDown={renderClick} onMouseUp={renderGo}></span>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {points.map((p, i) => (
+            <Point key={i} onDelete={() => deletePoint(i)} value={String.fromCharCode(65 + i)} onClick={() => gotoPoint(p)} />
+          ))}
+          {tgt && <button onClick={addPoint} style={{ padding: '1em', margin: '.3em', border: '2px solid #ccc', background: 'none', color: '#ccc', fontSize: 'large' }}>
+            Save
+          </button>}
+        </div>
       </div>
       <div>
         <GaugeRound connected loading={accW === null} target={null} value={accW} onChange={calibrateAcc} onMove={() => { }} />
@@ -426,6 +477,17 @@ const App = () => {
     </div>
   );
 };
+
+function Point({ onDelete, value, onClick }) {
+  return <div>
+    <button onClick={onClick} style={{ padding: '1em', margin: '.3em', border: '2px solid #ccc', background: 'none', color: '#ccc', fontSize: 'large' }}>
+      {value}
+    </button>
+    <button onClick={onDelete} style={{ padding: '1em', background: 'none', border: 'none', color: '#fcc' }}>
+      X
+    </button>
+  </div>
+}
 
 ReactDOM.render(
   <App />,

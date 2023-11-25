@@ -72,7 +72,7 @@ app.get('/acc/:mac', async (req, res) => {
   try {
     const mac = req.params.mac;
     const puck = await acc.connect(mac);
-    const raw = await puck('acc.read();');
+    const raw = await puck('r();');
     const parsed = yaml.parse(raw);
     res.json(parsed);
   } catch (e) {
